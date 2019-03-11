@@ -56,8 +56,8 @@ def load_config_and_logger(env_config_file, model_config_file, exp_dir, seed,
     config_str_model_ext = ''
 
     # Load env file and model
-    env_config, config_str_env = load_single_config(env_config_file)
-    model_config, config_str_model = load_single_config(model_config_file)
+    env_config, config_str_env = load_single_config(os.path.join("config","env", env_config_file))
+    model_config, config_str_model = load_single_config(os.path.join("config","model", model_config_file))
 
     # Override env and model files if specified
     if env_ext_file is not None:
