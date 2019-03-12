@@ -6,7 +6,7 @@ from torch.autograd import Variable
 from copy import deepcopy
 
 from rl_agent.agent_utils import ReplayMemory, Transition, freeze_as_np_dict, compute_slow_params_update, ReplayMemoryRecurrent
-from rl_agent.gpu_utils import use_cuda, FloatTensor, LongTensor, ByteTensor, Tensor
+from rl_agent.gpu_utils import TORCH_DEVICE
 
 from rl_agent.models import FullyConnectedModel
 
@@ -16,19 +16,14 @@ import logging
 class DQNAgent(object):
     def __init__(self, config, n_action, state_dim):
 
-        if config["agent_type"] == "dqn":
-            config = config['dqn_params']
-            model = FullyConnectedModel(config=config,
-                                        n_action=n_action,
-                                        state_dim=state_dim)
-        else:
-            raise NotImplementedError("model_type not recognized")
+        config = config['dqn_params']
+        model = FullyConnectedModel(config=config,
+                                    n_action=n_action,
+                                    state_dim=state_dim)
 
-        self.fast_model = model
-        self.ref_model = deepcopy(self.fast_model)
-        if use_cuda:
-            self.fast_model.cuda()
-            self.ref_model.cuda()
+        self.fast_model = model.to(TORCH_DEVICE)
+        self.ref_model = deepcopy(self.fast_model).to(TORCH_DEVICE)
+
         self.n_action = n_action
 
         self.tau = config['tau']
@@ -46,13 +41,11 @@ class DQNAgent(object):
             self.expected_exploration_steps = config["exploration_method"]["expected_step_explo"]
             self.n_step_eps = 0
 
-        elif config["exploration_method"] == "boltzmann":
-            self.forward = self.select_action_boltzmann
         else:
             raise NotImplementedError("Wrong action selection method")
 
         self.lr = config['learning_rate']
-        self.gamma = config['discount_factor']
+        self.discount_factor = config['discount_factor']
 
         if config['optimizer'].lower() == 'rmsprop':
             self.optimizer = optim.RMSprop(self.fast_model.parameters(), lr=self.lr)
@@ -80,7 +73,9 @@ class DQNAgent(object):
 
         # state is {"env_state" : img, "objective": img/text}
         var_state = dict()
-        var_state['env_state'] = FloatTensor(state['env_state']).unsqueeze(0)
+
+        #Todo : test requires grad
+        var_state['env_state'] = state['env_state'].unsqueeze(0).requires_grad_(True)
         return var_state
 
     def select_action_eps_greedy(self, state):
@@ -101,29 +96,20 @@ class DQNAgent(object):
             self.current_eps = self.epsilon_init * np.exp(-1. * self.n_step_eps / self.expected_exploration_steps)
             self.n_step_eps += 1
 
+        # Todo : test eps decay
         assert False, "Test epsilon decay here"
-
         return idx
-
-    def select_action_boltzmann(self, state, epsilon=0.1):
-
-        var_state = self.format_state(state=state)
-        score = F.softmax(self.fast_model(var_state), dim=1)
-        chosen_action = np.random.choice([i for i in range(self.n_action)], p=score.data.cpu().numpy()[0,:])
-
-        return chosen_action
-
 
     def optimize(self, state, action, next_state, reward):
 
         # state is {"env_state" : img, "objective": img}
-        state_loc = FloatTensor(state['env_state'])
-        next_state_loc = FloatTensor(next_state['env_state'])
+        state_loc = torch.FloatTensor(state['env_state'], requires_grad=True).to(TORCH_DEVICE)
+        next_state_loc = torch.FloatTensor(next_state['env_state'], requires_grad=True).to(TORCH_DEVICE)
 
         state = state_loc.unsqueeze(0)
         next_state = next_state_loc.unsqueeze(0)
-        action = LongTensor([int(action)]).view((1, 1,))
-        reward = FloatTensor([reward])
+        action = torch.LongTensor([int(action)]).view((1, 1,)).to(TORCH_DEVICE)
+        reward = torch.FloatTensor([reward]).to(TORCH_DEVICE)
 
         self.memory.push(state, action, next_state, reward)
 
@@ -135,10 +121,10 @@ class DQNAgent(object):
         transitions = self.memory.sample(batch_size)
         batch = Transition(*zip(*transitions))
 
-        state_batch = torch.cat(batch.state).type(Tensor).requires_grad_(True)
+        state_batch = torch.cat(batch.state).to(TORCH_DEVICE).requires_grad_(True)
 
-        action_batch = torch.cat(batch.action).type(LongTensor).requires_grad_(True)
-        reward_batch = torch.cat(batch.reward).type(Tensor).requires_grad_(True)
+        action_batch = torch.cat(batch.action).to(TORCH_DEVICE).requires_grad_(True)
+        reward_batch = torch.cat(batch.reward).to(TORCH_DEVICE).requires_grad_(True)
 
         if len(state_batch.shape) == 3:
             state_batch = state_batch.unsqueeze(0)
@@ -148,8 +134,8 @@ class DQNAgent(object):
 
         state_action_values = self.fast_model(state_obj).gather(1, action_batch)
 
-        non_final_mask = ByteTensor(tuple(map(lambda s: s is not None, batch.next_state)))
-        non_final_next_states = torch.cat([s for s in batch.next_state if s is not None]).type(Tensor)
+        non_final_mask = torch.ByteTensor(tuple(map(lambda s: s is not None, batch.next_state))).to(TORCH_DEVICE)
+        non_final_next_states = torch.cat([s for s in batch.next_state if s is not None]).to(TORCH_DEVICE)
         # check if requires grad
 
         non_final_next_states_obj = dict()
@@ -158,7 +144,7 @@ class DQNAgent(object):
         if len(non_final_next_states.shape) == 3:
             non_final_next_states = non_final_next_states.unsqueeze(0)
 
-        next_state_values = torch.zeros(batch_size).type(Tensor).requires_grad_(True)
+        next_state_values = torch.zeros(batch_size).to(TORCH_DEVICE).requires_grad_(True)
         next_state_values[non_final_mask] = self.ref_model(non_final_next_states_obj).max(1)[0]
 
         expected_state_action_values = (next_state_values * self.discount_factor) + reward_batch
@@ -184,7 +170,7 @@ class DQNAgent(object):
         # new_params = freeze_as_np_dict(self.fast_model.state_dict())
         # check_params_changed(old_params, new_params)
 
-        return loss.detach()[0]
+        return loss.detach().item()
 
     def save_state(self):
         # Store the whole agent state somewhere
