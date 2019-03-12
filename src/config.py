@@ -24,19 +24,6 @@ def override_config_recurs(config, config_extension):
 
     return config
 
-def create_experiment_directory(out, config_dict, seed):
-    """
-    Create all necessary directory to store experiment
-    Storing :
-        - Config files
-        - Std output
-        - Tensorboard logger (done in main loop)
-    """
-
-
-
-
-
 def load_single_config(config_file):
     with open(config_file, 'rb') as f_config:
         config_str = f_config.read().decode('utf-8')
