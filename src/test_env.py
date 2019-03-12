@@ -5,11 +5,14 @@ import argparse
 from os import path
 
 import gym
+import gym_minigrid
 import gym.wrappers
 
 import numpy as np
 
-from config import load_config_and_logger
+from config import load_config
+#from env.env_tool import env_basic_creator
+
 
 parser = argparse.ArgumentParser('Log Parser arguments!')
 
@@ -18,28 +21,24 @@ parser.add_argument("-env_ext",      type=str)
 parser.add_argument("-model_config", type=str)
 parser.add_argument("-model_ext",    type=str)
 parser.add_argument("-exp_dir",      type=str, default="out", help="Directory all results")
-parser.add_argument("-seed",         type=int, default=42, help="Random seed used")
+parser.add_argument("-seed",         type=int, default=0, help="Random seed used")
 
 
 args = parser.parse_args()
 
-full_config = load_config_and_logger(env_config_file=args.env_config,
-                                     model_config_file=args.model_config,
-                                     env_ext_file=args.env_ext,
-                                     model_ext_file=args.model_ext,
-                                     exp_dir=args.exp_dir,
-                                     seed=args.seed
-                                     )
+full_config = load_config(env_config_file=args.env_config,
+                          model_config_file=args.model_config,
+                          env_ext_file=args.env_ext,
+                          model_ext_file=args.model_ext
+                          )
 
 
 #game = env_basic_creator(full_config["env_config"])
 #game.render('human')
-
-
 game = gym.make(full_config["env_name"])
 
 
-#game = gym.wrappers.Monitor(game, "test_out", resume=False, force=True)
+game = gym.wrappers.Monitor(game, "test_out", resume=False, force=True)
 
 episodes = 100
 mean = 0
