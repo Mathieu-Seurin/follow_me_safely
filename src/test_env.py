@@ -37,7 +37,6 @@ full_config = load_config(env_config_file=args.env_config,
 #game.render('human')
 game = gym.make(full_config["env_name"])
 
-
 game = gym.wrappers.Monitor(game, "test_out", resume=False, force=True)
 
 episodes = 100

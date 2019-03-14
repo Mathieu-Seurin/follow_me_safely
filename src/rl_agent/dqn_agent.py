@@ -11,20 +11,30 @@ from rl_agent.gpu_utils import TORCH_DEVICE
 from rl_agent.models import FullyConnectedModel
 
 import logging
+from copy import copy
 
+
+class FullRandomAgent(object):
+    def __init__(self, config, n_action, state_dim):
+        self.n_action = n_action.n
+    def forward(self, *args, **kwargs):
+        return np.random.randint(0, self.n_action, size=None)
+    def optimize(self, *args, **kwargs):
+        pass
+    def callback(self, *args, **kwargs):
+        pass
 
 class DQNAgent(object):
     def __init__(self, config, n_action, state_dim):
 
-        config = config['dqn_params']
-        model = FullyConnectedModel(config=config,
+        model = FullyConnectedModel(config=config["model_params"],
                                     n_action=n_action,
                                     state_dim=state_dim)
 
         self.fast_model = model.to(TORCH_DEVICE)
         self.ref_model = deepcopy(self.fast_model).to(TORCH_DEVICE)
 
-        self.n_action = n_action
+        self.n_action = n_action.n
 
         self.tau = config['tau']
         self.batch_size = config["batch_size"]
@@ -34,15 +44,17 @@ class DQNAgent(object):
 
         self.memory = ReplayMemory(config["memory_size"])
 
-        if config["exploration_method"] == "eps_greedy":
-            self.forward = self.select_action_eps_greedy
+        if config["exploration_method"]["name"] == "eps_greedy":
+            self.forward = self._select_action_eps_greedy
             self.epsilon_init = config["exploration_method"]["begin_eps"]
-            self.current_eps = self.current_eps.copy()
+            self.current_eps = copy(self.epsilon_init)
             self.expected_exploration_steps = config["exploration_method"]["expected_step_explo"]
+            self.minimum_epsilon = config["exploration_method"]["epsilon_minimum"]
             self.n_step_eps = 0
 
         else:
-            raise NotImplementedError("Wrong action selection method")
+            raise NotImplementedError("Wrong action selection method, chosen : {}".format(
+                config["exploration_method"]["name"]))
 
         self.lr = config['learning_rate']
         self.discount_factor = config['discount_factor']
@@ -75,41 +87,41 @@ class DQNAgent(object):
         var_state = dict()
 
         #Todo : test requires grad
-        var_state['env_state'] = state['env_state'].unsqueeze(0).requires_grad_(True)
+        var_state['env_state'] = torch.FloatTensor(state['image']).unsqueeze(0).to(TORCH_DEVICE)
         return var_state
 
-    def select_action_eps_greedy(self, state):
+    def _select_action_eps_greedy(self, state):
 
         if self.fast_model.train:
-            epsilon = 0
+            epsilon = self.minimum_epsilon
         else:
             epsilon = self.current_eps
 
-        plop = np.random.rand()
-        if plop < epsilon:
-            idx = np.random.randint(self.n_action)
+        random_number = np.random.rand()
+        if random_number < epsilon:
+            action = np.random.randint(self.n_action)
         else:
             var_state = self.format_state(state)
-            idx = self.fast_model(var_state).data.max(1)[1].cpu().numpy()[0]
+            action = self.fast_model(var_state).data.max(1)[1].cpu().numpy()[0]
 
+        # Formula for eps decay :
+        # exp(- 2.5 * iter / expected iter)  2.5 is set by hand, just to have a smooth decay until end
+        # init = 100%     end = 5%
+        # 0% : eps=1      10% : eps=0.77    50% : eps=0.28     80% : eps=0.13
         if self.fast_model.train :
-            self.current_eps = self.epsilon_init * np.exp(-1. * self.n_step_eps / self.expected_exploration_steps)
+            self.current_eps = max(self.minimum_epsilon, self.epsilon_init * np.exp(- 2.5 * self.n_step_eps / self.expected_exploration_steps))
             self.n_step_eps += 1
 
-        # Todo : test eps decay
-        assert False, "Test epsilon decay here"
-        return idx
+        return action
 
     def optimize(self, state, action, next_state, reward):
 
         # state is {"env_state" : img, "objective": img}
-        state_loc = torch.FloatTensor(state['env_state'], requires_grad=True).to(TORCH_DEVICE)
-        next_state_loc = torch.FloatTensor(next_state['env_state'], requires_grad=True).to(TORCH_DEVICE)
+        state = torch.FloatTensor(np.expand_dims(state['image'], axis=0))
+        next_state = torch.FloatTensor(np.expand_dims(next_state['image'], axis=0))
 
-        state = state_loc.unsqueeze(0)
-        next_state = next_state_loc.unsqueeze(0)
-        action = torch.LongTensor([int(action)]).view((1, 1,)).to(TORCH_DEVICE)
-        reward = torch.FloatTensor([reward]).to(TORCH_DEVICE)
+        action = torch.LongTensor(np.expand_dims(np.array([int(action)]), axis=0))
+        reward = torch.FloatTensor(np.array([reward]))
 
         self.memory.push(state, action, next_state, reward)
 
@@ -123,8 +135,8 @@ class DQNAgent(object):
 
         state_batch = torch.cat(batch.state).to(TORCH_DEVICE).requires_grad_(True)
 
-        action_batch = torch.cat(batch.action).to(TORCH_DEVICE).requires_grad_(True)
-        reward_batch = torch.cat(batch.reward).to(TORCH_DEVICE).requires_grad_(True)
+        action_batch = torch.cat(batch.action).to(TORCH_DEVICE)
+        reward_batch = torch.cat(batch.reward).to(TORCH_DEVICE)
 
         if len(state_batch.shape) == 3:
             state_batch = state_batch.unsqueeze(0)
@@ -144,8 +156,9 @@ class DQNAgent(object):
         if len(non_final_next_states.shape) == 3:
             non_final_next_states = non_final_next_states.unsqueeze(0)
 
-        next_state_values = torch.zeros(batch_size).to(TORCH_DEVICE).requires_grad_(True)
+        next_state_values = torch.zeros(batch_size).to(TORCH_DEVICE)
         next_state_values[non_final_mask] = self.ref_model(non_final_next_states_obj).max(1)[0]
+        #next_state_values = next_state_values.requires_grad_(True)
 
         expected_state_action_values = (next_state_values * self.discount_factor) + reward_batch
 
@@ -153,7 +166,7 @@ class DQNAgent(object):
         loss = loss_q_learning
 
         #old_params = freeze_as_np_dict(self.forward_model.state_dict())
-        self.fast_model.optimizer.zero_grad()
+        self.optimizer.zero_grad()
         loss.backward()
 
         if self.clamp_grad:
@@ -161,7 +174,7 @@ class DQNAgent(object):
                 #logging.debug(param.grad.data.sum())
                 param.grad.data.clamp_(-1., 1.)
 
-        self.fast_model.optimizer.step()
+        self.optimizer.step()
 
         # Update slowly ref model towards fast model, to stabilize training.
         if self.soft_update:

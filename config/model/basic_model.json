@@ -1,3 +1,29 @@
 {
-  "agent_name" : "random_agent"
+  "name": "dqn_mlp_agent",
+
+  "agent_type" : "dqn",
+
+  "dqn_params": {
+    "model_params": {
+      "n_mlp_hidden": 512
+    },
+
+    "discount_factor": 0.95,
+    "memory_size": 20000,
+
+    "clamp_grad": true,
+    "optimizer": "rmsprop",
+    "learning_rate": 3e-4,
+    "batch_size": 64,
+
+    "exploration_method": {
+      "name" : "eps_greedy",
+      "begin_eps" : 1,
+      "expected_step_explo" : 2000,
+      "epsilon_minimum" : 0.04
+
+    },
+    "tau": 0.01,
+    "soft_update": false
+  }
 }

@@ -1,0 +1,7 @@
+{
+  "name": "random_agent",
+  "agent_type" : "random",
+
+  "discount_factor": 0.99
+
+}

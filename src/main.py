@@ -10,10 +10,11 @@ import gym.wrappers
 
 import numpy as np
 
-from config import load_config, create_experiment_directory
-from rl_agent.dqn_agent import DQNAgent
+from config import load_config
+from rl_agent.dqn_agent import DQNAgent, FullRandomAgent
 
 import tensorboardX
+import os
 
 parser = argparse.ArgumentParser('Log Parser arguments!')
 
@@ -35,51 +36,77 @@ full_config, expe_path = load_config(env_config_file=args.env_config,
                           seed=args.seed
                           )
 
+writer = tensorboardX.SummaryWriter(expe_path)
+
 game = gym.make(full_config["env_name"])
-model = DQNAgent(config=full_config,
-                 n_action=game.action_space,
-                 state_dim=game.observation_space)
+
+game = gym.wrappers.Monitor(game, directory=expe_path, force=True)
+
+model_type = full_config["agent_type"]
+if model_type == "dqn" :
+    model = DQNAgent(config=full_config["dqn_params"],
+                     n_action=game.action_space,
+                     state_dim=game.observation_space)
+elif model_type == "random" :
+    model = FullRandomAgent(config=full_config, n_action=game.action_space, state_dim=game.observation_space)
+
 
 
 episodes = full_config["stop"]["episodes_total"]
-mean = 0
+score_success = full_config["stop"]["episode_reward_mean"]
+
 rew_list = []
-total_frame = 0
+discount_factor = full_config["discount_factor"]
+total_iter = 0
+success_count = 0
 
-longest = 0
 
-a = time.time()
-for i in range(1, episodes):
+for num_episode in range(1, episodes):
     state = game.reset()
+    game.render()
     done = False
-    j = 0
-    reward_total = 0
+    iter_this_ep = 0
+    reward_total_discounted = 0
+    reward_total_not_discounted = 0
+
     while not done:
-        action = game.action_space.sample()
-        observation, reward, done, info = game.step(action=action)
 
-        #longest = max(longest, len(observation['mission']))
+        action = model.forward(state)
+        next_state, reward, done, info = game.step(action=action)
+        game.render()
+        model.optimize(state=state, action=action, next_state=next_state, reward=reward)
 
-        j = j+1
-        reward_total += reward
+        state = next_state
+
+        iter_this_ep = iter_this_ep + 1
+        reward_total_discounted += reward * (discount_factor ** iter_this_ep)
+        reward_total_not_discounted += reward
 
         if done:
-            model.callback(epoch=i)
+            model.callback(epoch=num_episode)
 
-            rew_list.append(reward_total)
-            total_frame += j
+            total_iter += iter_this_ep
 
-            if i == 0 :
-                mean = reward_total
+            rew_list.append(reward_total_discounted)
+            writer.add_scalar("data/sum_reward_discounted", reward_total_discounted, total_iter)
+            writer.add_scalar("data/sum_reward_not_discounted", reward_total_not_discounted, total_iter)
+            writer.add_scalar("data/iter_per_ep", iter_this_ep, total_iter)
+
+            # todo create logging
+            if num_episode%100 == 0:
+                print("Reward at the end of ep #{} discounted rew : {} undiscounted : {}".format(
+                    total_iter, reward_total_discounted, reward_total_not_discounted))
+
+            if reward_total_discounted > score_success:
+                success_count += 1
             else:
-                mean = mean + reward_total/episodes
-            break
+                success_count = 0
 
-print("time elpase", time.time() - a)
-print("framerate :", total_frame / (time.time() - a))
+    #print("Steps iter main {}, iter in model {}, eps {}".format(total_iter, model.n_step_eps, model.current_eps))
 
-print(mean)
-print(np.mean(rew_list))
+    if success_count > 5:
+        break
 
-# print("Number gen double : ", game.env.count_double, "  ", game.env.count_gen)
-# print("Number of double : ", game.env.count_double/game.env.count_gen)
+
+print("Experiment over")
+print("Last 5 epoch's rewards  : ", rew_list[-4:])

@@ -24,8 +24,6 @@ class ReplayMemory(object):
         if len(self.memory) < self.capacity:
             self.memory.append(None)
 
-        # To avoid storing everything on gpu
-        args = [arg.cpu() for arg in args]
         self.memory[self.position] = Transition(*args)
         self.position = (self.position + 1) % self.capacity
 
