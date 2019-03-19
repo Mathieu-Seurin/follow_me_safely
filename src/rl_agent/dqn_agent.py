@@ -8,7 +8,7 @@ from copy import deepcopy
 from rl_agent.agent_utils import ReplayMemory, Transition, freeze_as_np_dict, compute_slow_params_update, ReplayMemoryRecurrent
 from rl_agent.gpu_utils import TORCH_DEVICE
 
-from rl_agent.models import FullyConnectedModel
+from rl_agent.models import FullyConnectedModel, ConvModel
 
 import logging
 from copy import copy
@@ -27,9 +27,15 @@ class FullRandomAgent(object):
 class DQNAgent(object):
     def __init__(self, config, n_action, state_dim):
 
-        model = FullyConnectedModel(config=config["model_params"],
-                                    n_action=n_action,
-                                    state_dim=state_dim)
+        if config["model_type"] == "fc":
+            model = FullyConnectedModel(config=config["model_params"],
+                                        n_action=n_action,
+                                        state_dim=state_dim)
+        else:
+            model = ConvModel(config=config["model_params"],
+                                        n_action=n_action,
+                                        state_dim=state_dim)
+
 
         self.fast_model = model.to(TORCH_DEVICE)
         self.ref_model = deepcopy(self.fast_model).to(TORCH_DEVICE)
@@ -133,7 +139,7 @@ class DQNAgent(object):
         transitions = self.memory.sample(batch_size)
         batch = Transition(*zip(*transitions))
 
-        state_batch = torch.cat(batch.state).to(TORCH_DEVICE).requires_grad_(True)
+        state_batch = torch.cat(batch.state).to(TORCH_DEVICE)
 
         action_batch = torch.cat(batch.action).to(TORCH_DEVICE)
         reward_batch = torch.cat(batch.reward).to(TORCH_DEVICE)
@@ -156,11 +162,12 @@ class DQNAgent(object):
         if len(non_final_next_states.shape) == 3:
             non_final_next_states = non_final_next_states.unsqueeze(0)
 
-        next_state_values = torch.zeros(batch_size).to(TORCH_DEVICE)
-        next_state_values[non_final_mask] = self.ref_model(non_final_next_states_obj).max(1)[0]
-        #next_state_values = next_state_values.requires_grad_(True)
+        # Don't rembember gradients when computing the Q-value reference.
+        with torch.no_grad():
+            next_state_values = torch.zeros(batch_size).to(TORCH_DEVICE)
+            next_state_values[non_final_mask] = self.ref_model(non_final_next_states_obj).max(1)[0]
 
-        expected_state_action_values = (next_state_values * self.discount_factor) + reward_batch
+            expected_state_action_values = (next_state_values * self.discount_factor) + reward_batch
 
         loss_q_learning = F.mse_loss(state_action_values, expected_state_action_values)
         loss = loss_q_learning

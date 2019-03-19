@@ -1,14 +1,20 @@
 {
-  "name": "dqn_mlp_agent",
+  "name": "dqn_conv_agent_tweak1",
 
   "agent_type" : "dqn",
 
   "dqn_params": {
 
-    "model_type" : "fc",
+    "model_type" : "conv",
 
     "model_params": {
-      "n_mlp_hidden": 512
+      "n_layers" : 3,
+      "out_channels" : [16,32,64],
+      "kernel_size" : [2,2,2],
+      "pooling" : [2],
+
+      "n_mlp_hidden" : 64
+
     },
 
     "discount_factor": 0.95,
@@ -16,8 +22,10 @@
 
     "clamp_grad": true,
     "optimizer": "rmsprop",
-    "learning_rate": 3e-4,
-    "batch_size": 64,
+    "learning_rate": 5e-4,
+    "batch_size": 128,
+
+    "use_memory" : false,
 
     "exploration_method": {
       "name" : "eps_greedy",
