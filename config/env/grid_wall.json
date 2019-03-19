@@ -1,0 +1,8 @@
+{
+  "name": "MiniGrid-SimpleCrossingS9N1-v0",
+  "stop" : {
+    "episode_reward_mean" : 0.9,
+    "episodes_total" : 1e6
+  }
+}
+
