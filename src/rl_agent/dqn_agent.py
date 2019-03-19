@@ -21,11 +21,11 @@ class FullRandomAgent(object):
         return np.random.randint(0, self.n_action, size=None)
     def optimize(self, *args, **kwargs):
         pass
-    def callback(self, *args, **kwargs):
+    def callback(self, timestep):
         pass
 
 class DQNAgent(object):
-    def __init__(self, config, n_action, state_dim):
+    def __init__(self, config, n_action, state_dim, discount_factor):
 
         if config["model_type"] == "fc":
             model = FullyConnectedModel(config=config["model_params"],
@@ -63,7 +63,7 @@ class DQNAgent(object):
                 config["exploration_method"]["name"]))
 
         self.lr = config['learning_rate']
-        self.discount_factor = config['discount_factor']
+        self.discount_factor = discount_factor
 
         if config['optimizer'].lower() == 'rmsprop':
             self.optimizer = optim.RMSprop(self.fast_model.parameters(), lr=self.lr)
@@ -75,9 +75,12 @@ class DQNAgent(object):
         # logging.info('Model summary :')
         # logging.info(self.forward_model.forward)
 
-    def callback(self, epoch):
-        if not self.soft_update and epoch % int(1/self.tau) == 0:
+        self.num_update = 0
+
+    def callback(self, timestep):
+        if not self.soft_update and timestep % int(1/self.tau) == 0:
             self.ref_model.load_state_dict(self.fast_model.state_dict())
+            self.num_update += 1
 
     def train(self):
         self.fast_model.train()
@@ -92,7 +95,6 @@ class DQNAgent(object):
         # state is {"env_state" : img, "objective": img/text}
         var_state = dict()
 
-        #Todo : test requires grad
         var_state['env_state'] = torch.FloatTensor(state['image']).unsqueeze(0).to(TORCH_DEVICE)
         return var_state
 
@@ -108,7 +110,8 @@ class DQNAgent(object):
             action = np.random.randint(self.n_action)
         else:
             var_state = self.format_state(state)
-            action = self.fast_model(var_state).data.max(1)[1].cpu().numpy()[0]
+            with torch.no_grad():
+                action = self.fast_model(var_state).data.max(1)[1].cpu().numpy()[0]
 
         # Formula for eps decay :
         # exp(- 2.5 * iter / expected iter)  2.5 is set by hand, just to have a smooth decay until end

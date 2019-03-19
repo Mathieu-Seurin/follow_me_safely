@@ -7,6 +7,7 @@ from os import path
 import gym
 import gym_minigrid
 import gym.wrappers
+from wrapper import PreprocessWrapper
 
 import numpy as np
 
@@ -38,18 +39,9 @@ full_config, expe_path = load_config(env_config_file=args.env_config,
 
 writer = tensorboardX.SummaryWriter(expe_path)
 
-game = gym.make(full_config["env_name"])
+game = PreprocessWrapper(gym.make(full_config["env_name"]))
 
-game = gym.wrappers.Monitor(game, directory=expe_path, force=True)
-
-model_type = full_config["agent_type"]
-if model_type == "dqn" :
-    model = DQNAgent(config=full_config["dqn_params"],
-                     n_action=game.action_space,
-                     state_dim=game.observation_space)
-elif model_type == "random" :
-    model = FullRandomAgent(config=full_config, n_action=game.action_space, state_dim=game.observation_space)
-
+#game = gym.wrappers.Monitor(game, directory=expe_path, force=True)
 
 
 episodes = full_config["stop"]["episodes_total"]
@@ -61,9 +53,20 @@ total_iter = 0
 success_count = 0
 
 
+
+model_type = full_config["agent_type"]
+if model_type == "dqn" :
+    model = DQNAgent(config=full_config["dqn_params"],
+                     n_action=game.action_space,
+                     state_dim=game.observation_space,
+                     discount_factor=discount_factor)
+elif model_type == "random" :
+    model = FullRandomAgent(config=full_config, n_action=game.action_space, state_dim=game.observation_space)
+
+
 for num_episode in range(1, episodes):
     state = game.reset()
-    game.render()
+    #game.render()
     done = False
     iter_this_ep = 0
     reward_total_discounted = 0
@@ -73,29 +76,31 @@ for num_episode in range(1, episodes):
 
         action = model.forward(state)
         next_state, reward, done, info = game.step(action=action)
-        game.render()
+        #game.render()
         model.optimize(state=state, action=action, next_state=next_state, reward=reward)
 
         state = next_state
 
+        total_iter += 1
         iter_this_ep = iter_this_ep + 1
+        model.callback(timestep=total_iter)
+
         reward_total_discounted += reward * (discount_factor ** iter_this_ep)
         reward_total_not_discounted += reward
 
         if done:
-            model.callback(epoch=num_episode)
-
-            total_iter += iter_this_ep
 
             rew_list.append(reward_total_discounted)
             writer.add_scalar("data/sum_reward_discounted", reward_total_discounted, total_iter)
             writer.add_scalar("data/sum_reward_not_discounted", reward_total_not_discounted, total_iter)
             writer.add_scalar("data/iter_per_ep", iter_this_ep, total_iter)
+            writer.add_scalar("data/epsilon", model.current_eps, total_iter)
+            writer.add_scalar("data/model_update", model.num_update, total_iter)
 
             # todo create logging
             if num_episode%100 == 0:
-                print("Reward at the end of ep #{} discounted rew : {} undiscounted : {}".format(
-                    total_iter, reward_total_discounted, reward_total_not_discounted))
+                print("Reward at the end of ep #{}, n_timesteps {}, discounted rew : {} undiscounted : {}, current_eps".format(
+                    num_episode, total_iter, reward_total_discounted, reward_total_not_discounted, model.current_eps))
 
             if reward_total_discounted > score_success:
                 success_count += 1

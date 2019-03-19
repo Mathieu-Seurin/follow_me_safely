@@ -1,7 +1,8 @@
 {
-  "name": "dqn_conv_agent_tweak1",
+  "name": "dqn_conv_agent",
 
   "agent_type" : "dqn",
+  "discount_factor": 0.95,
 
   "dqn_params": {
 
@@ -13,11 +14,11 @@
       "kernel_size" : [2,2,2],
       "pooling" : [2],
 
-      "n_mlp_hidden" : 64
+      "n_mlp_hidden" : 64,
+      "use_memory" : false
 
     },
 
-    "discount_factor": 0.95,
     "memory_size": 20000,
 
     "clamp_grad": true,
@@ -25,16 +26,14 @@
     "learning_rate": 5e-4,
     "batch_size": 128,
 
-    "use_memory" : false,
-
     "exploration_method": {
       "name" : "eps_greedy",
       "begin_eps" : 1,
-      "expected_step_explo" : 2000,
+      "expected_step_explo" : 30000,
       "epsilon_minimum" : 0.04
 
     },
-    "tau": 0.01,
+    "tau": 0.001,
     "soft_update": false
   }
 }
