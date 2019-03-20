@@ -17,7 +17,28 @@ def env_basic_creator(env_config):
 
 class ConvPolicy(Model):
     def _build_layers_v2(self, input_dict, num_outputs, options):
-        pass
+
+        config = options["custom_options"]
+
+        n_resblock = config["vision"]["resblock_config"]["n_resblock"]
+        initializers_mlp = get_init_mlp()
+        initializers_conv = get_init_conv()
+
+        # Image part
+        #============
+        state = input_dict["obs"]["image"]
+
+        # Stem
+        feat_stem = state
+        stem_config = config["vision"]["stem_config"]
+
+        for layer in range(stem_config["n_layers"]):
+            feat_stem = snt.Conv2D(output_channels=stem_config["n_channels"][layer],
+                                   # the number of channel is marked as list, index=channel at this layer
+                                   kernel_shape=stem_config["kernel"][layer],
+                                   stride=stem_config["stride"][layer],
+                                   padding=snt.VALID,
+                                   initializers=initializers_conv)(feat_stem)
 
 
 class FullConnectedPolicy(Model):

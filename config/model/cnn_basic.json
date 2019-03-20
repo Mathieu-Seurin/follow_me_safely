@@ -1,8 +1,8 @@
 {
-  "name": "dqn_conv_agent",
+  "name": "dqn_conv_agent_prio",
 
   "agent_type" : "dqn",
-  "discount_factor": 0.95,
+  "discount_factor": 0.99,
 
   "dqn_params": {
 
@@ -19,7 +19,8 @@
 
     },
 
-    "memory_size": 20000,
+    "memory" : "prioritized",
+    "memory_size": 50000,
 
     "clamp_grad": true,
     "optimizer": "rmsprop",

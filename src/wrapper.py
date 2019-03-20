@@ -1,7 +1,8 @@
 import gym
 import numpy as np
 
-class PreprocessWrapper(gym.Wrapper):
+
+class PreprocessWrapper(gym.core.ObservationWrapper):
     def __init__(self, env):
         super().__init__(env)
 
@@ -13,15 +14,9 @@ class PreprocessWrapper(gym.Wrapper):
 
         self.observation_space.spaces["image"] = gym.spaces.Box(0,1, shape=new_shape, dtype=np.float32)
 
-    def step(self, action):
-
-        obs, reward, done, info = self.unwrapped.step(action)
-        return self._preprocess_obs(obs), reward, done, info
-
-    def reset(self):
-        return self._preprocess_obs(self.unwrapped.reset())
+    def observation(self, obs):
+        return self._preprocess_obs(obs)
 
     def _preprocess_obs(self, obs):
-
         obs['image'] = np.transpose(obs['image'], self.transpose_tuple)
         return obs
