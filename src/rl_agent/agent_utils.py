@@ -19,12 +19,12 @@ class ReplayMemory(object):
         self.memory = []
         self.position = 0
 
-    def push(self, *args):
+    def push(self, state, action, next_state, reward, error=0):
         """Saves a transition."""
         if len(self.memory) < self.capacity:
             self.memory.append(None)
 
-        self.memory[self.position] = Transition(*args)
+        self.memory[self.position] = Transition(state, action, next_state, reward)
         self.position = (self.position + 1) % self.capacity
 
     def sample(self, batch_size):
@@ -33,6 +33,12 @@ class ReplayMemory(object):
 
     def __len__(self):
         return len(self.memory)
+
+
+class PrioritizedMemory(object):
+
+    def __init__(self, capacity):
+        raise NotImplementedError("Not yet")
 
 
 class ReplayMemoryRecurrent(object):

@@ -1,5 +1,5 @@
 {
-  "name": "dqn_mlp_agent",
+  "name": "dqn_mlp_agent_cart_after_mem_fix_tweak15",
 
   "agent_type" : "dqn",
   "discount_factor": 0.99,
@@ -9,24 +9,26 @@
     "model_type" : "fc",
 
     "model_params": {
-      "n_mlp_hidden": 512
+      "n_mlp_hidden": 128
     },
 
-    "memory_size": 20000,
+    "memory" : "normal",
+    "memory_size": 10000,
 
     "clamp_grad": true,
     "optimizer": "rmsprop",
-    "learning_rate": 3e-4,
-    "batch_size": 64,
+    "learning_rate": 1e-3,
+    "batch_size": 128,
 
     "exploration_method": {
       "name" : "eps_greedy",
       "begin_eps" : 1,
-      "expected_step_explo" : 2000,
+      "expected_step_explo" : 10000,
       "epsilon_minimum" : 0.04
 
     },
-    "tau": 0.0001,
+
+    "tau": 0.01,
     "soft_update": false
   }
 }

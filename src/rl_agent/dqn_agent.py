@@ -5,7 +5,9 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from copy import deepcopy
 
-from rl_agent.agent_utils import ReplayMemory, Transition, freeze_as_np_dict, compute_slow_params_update, ReplayMemoryRecurrent
+from rl_agent.agent_utils import ReplayMemory, PrioritizedMemory, Transition, \
+    freeze_as_np_dict, compute_slow_params_update, ReplayMemoryRecurrent
+
 from rl_agent.gpu_utils import TORCH_DEVICE
 
 from rl_agent.models import FullyConnectedModel, ConvModel
@@ -38,7 +40,7 @@ class DQNAgent(object):
 
 
         self.fast_model = model.to(TORCH_DEVICE)
-        self.ref_model = deepcopy(self.fast_model).to(TORCH_DEVICE)
+        self.ref_model = deepcopy(self.fast_model).to(TORCH_DEVICE).eval()
 
         self.n_action = n_action.n
 
@@ -48,7 +50,10 @@ class DQNAgent(object):
 
         self.clamp_grad = config["clamp_grad"]
 
-        self.memory = ReplayMemory(config["memory_size"])
+        if config["memory"] == "prioritized":
+            self.memory = PrioritizedMemory(config["memory_size"])
+        else:
+            self.memory = ReplayMemory(config["memory_size"])
 
         if config["exploration_method"]["name"] == "eps_greedy":
             self.forward = self._select_action_eps_greedy
@@ -95,7 +100,9 @@ class DQNAgent(object):
         # state is {"env_state" : img, "objective": img/text}
         var_state = dict()
 
-        var_state['env_state'] = torch.FloatTensor(state['image']).unsqueeze(0).to(TORCH_DEVICE)
+        env_state = state['image'] if isinstance(state, dict) else state
+
+        var_state['env_state'] = torch.FloatTensor(env_state).unsqueeze(0).to(TORCH_DEVICE)
         return var_state
 
     def _select_action_eps_greedy(self, state):
@@ -123,19 +130,40 @@ class DQNAgent(object):
 
         return action
 
-    def optimize(self, state, action, next_state, reward):
+    def push(self, state, action, next_state, reward):
+        # with torch.no_grad():
+        #
+        #     current_est = self.fast_model(self.format_state(state)).detach()[0][action] # [0] is for batch_dimension
+        #
+        #     if next_state != None:
+        #         next_state_val = self.ref_model(self.format_state(next_state)).detach().max()
+        #         target_val = reward + self.discount_factor * next_state_val
+        #     else:
+        #         target_val = reward
+        #
+        #     error = abs(current_est - target_val)
+
+        state = state['image'] if isinstance(state, dict) else state
+        next_state = next_state['image'] if isinstance(next_state, dict) else next_state
 
         # state is {"env_state" : img, "objective": img}
-        state = torch.FloatTensor(np.expand_dims(state['image'], axis=0))
-        next_state = torch.FloatTensor(np.expand_dims(next_state['image'], axis=0))
+        state = torch.FloatTensor(np.expand_dims(state, axis=0))
+
+        if isinstance(next_state, np.ndarray) :
+            next_state = torch.FloatTensor(np.expand_dims(next_state, axis=0))
 
         action = torch.LongTensor(np.expand_dims(np.array([int(action)]), axis=0))
         reward = torch.FloatTensor(np.array([reward]))
 
-        self.memory.push(state, action, next_state, reward)
+        error = 0
+        self.memory.push(state, action, next_state, reward, error)
 
-        if len(self.memory.memory) < self.batch_size:
-            batch_size = len(self.memory.memory)
+    def optimize(self):
+        #  Optimize with respect to replay buffer
+        # =======================================
+
+        if len(self.memory) < self.batch_size:
+            return
         else:
             batch_size = self.batch_size
 
@@ -166,13 +194,12 @@ class DQNAgent(object):
             non_final_next_states = non_final_next_states.unsqueeze(0)
 
         # Don't rembember gradients when computing the Q-value reference.
-        with torch.no_grad():
-            next_state_values = torch.zeros(batch_size).to(TORCH_DEVICE)
-            next_state_values[non_final_mask] = self.ref_model(non_final_next_states_obj).max(1)[0]
+        next_state_values = torch.zeros(batch_size).to(TORCH_DEVICE)
+        next_state_values[non_final_mask] = self.ref_model(non_final_next_states_obj).max(1)[0].detach()
 
-            expected_state_action_values = (next_state_values * self.discount_factor) + reward_batch
+        expected_state_action_values = (next_state_values * self.discount_factor) + reward_batch
 
-        loss_q_learning = F.mse_loss(state_action_values, expected_state_action_values)
+        loss_q_learning = F.smooth_l1_loss(state_action_values, expected_state_action_values)
         loss = loss_q_learning
 
         #old_params = freeze_as_np_dict(self.forward_model.state_dict())

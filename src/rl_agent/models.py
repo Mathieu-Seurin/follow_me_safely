@@ -6,6 +6,7 @@ import torch.nn.functional as F
 
 import numpy as np
 
+import gym
 
 class FullyConnectedModel(nn.Module):
     def __init__(self, config, n_action, state_dim):
@@ -14,7 +15,11 @@ class FullyConnectedModel(nn.Module):
         self.output_size = n_action.n
         self.n_hidden_mlp = config["n_mlp_hidden"]
 
-        self.n_input = np.product(state_dim.spaces["image"].shape)
+        if isinstance(state_dim, gym.spaces.Box):
+            self.n_input = np.product(state_dim.shape)
+        else: #  if "image" in state_dim.spaces["image"]:
+            self.n_input = np.product(state_dim.spaces["image"].shape)
+
         self.additionnal_input_size = 0
 
         self.hidden_layer = nn.Linear(self.n_input+self.additionnal_input_size, self.n_hidden_mlp)

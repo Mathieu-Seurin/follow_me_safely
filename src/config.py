@@ -39,7 +39,7 @@ def check_json_intregrity(config_file_path, config_dict):
 def load_config(env_config_file, model_config_file, seed,
                 out_dir,
                 env_ext_file=None,
-                model_ext_file=None,
+                model_ext_file=None
                 ):
 
     # === Loading ENV config, extension and check integrity =====

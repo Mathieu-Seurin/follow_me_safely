@@ -1,8 +1,8 @@
 {
   "name": "MiniGrid-Empty-6x6-v0",
   "stop" : {
-    "episode_reward_mean" : 0.80,
-    "episodes_total" : 1000
+    "episode_reward_mean" : 0.90,
+    "episodes_total" : 100000
   }
 }
 

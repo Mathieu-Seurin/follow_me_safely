@@ -26,11 +26,13 @@ parser.add_argument("-seed",         type=int, default=0, help="Random seed used
 
 args = parser.parse_args()
 
-full_config = load_config(env_config_file=args.env_config,
+full_config, save_path = load_config(env_config_file=args.env_config,
                           model_config_file=args.model_config,
                           env_ext_file=args.env_ext,
-                          model_ext_file=args.model_ext
-                          )
+                          model_ext_file=args.model_ext,
+                          out_dir=args.exp_dir,
+                          seed=args.seed)
+
 
 
 #game = env_basic_creator(full_config["env_config"])
