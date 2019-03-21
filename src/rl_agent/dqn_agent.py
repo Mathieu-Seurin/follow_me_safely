@@ -23,7 +23,7 @@ class FullRandomAgent(object):
         return np.random.randint(0, self.n_action, size=None)
     def optimize(self, *args, **kwargs):
         pass
-    def callback(self, timestep):
+    def callback(self, epoch):
         pass
 
 class DQNAgent(object):
@@ -82,8 +82,8 @@ class DQNAgent(object):
 
         self.num_update = 0
 
-    def callback(self, timestep):
-        if not self.soft_update and timestep % int(1/self.tau) == 0:
+    def callback(self, epoch):
+        if not self.soft_update and epoch % int(1/self.tau) == 0:
             self.ref_model.load_state_dict(self.fast_model.state_dict())
             self.num_update += 1
 

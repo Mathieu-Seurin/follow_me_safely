@@ -85,7 +85,7 @@ for num_episode in range(1, episodes):
 
         total_iter += 1
         iter_this_ep = iter_this_ep + 1
-        model.callback(timestep=total_iter)
+        model.callback(epoch=num_episode)
 
         reward_total_discounted += reward * (discount_factor ** iter_this_ep)
         reward_total_not_discounted += reward
