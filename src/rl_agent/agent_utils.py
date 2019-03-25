@@ -37,8 +37,41 @@ class ReplayMemory(object):
 
 class PrioritizedMemory(object):
 
-    def __init__(self, capacity):
-        raise NotImplementedError("Not yet")
+    def __init__(self, capacity, alpha=0.6):
+        self.capacity = capacity
+
+        self.memory = []
+        self.errors = []
+        self.indexes = []
+
+        self.position = 0
+        self.alpha = alpha
+
+    def push(self, state, action, next_state, reward, error=0):
+        """Saves a transition."""
+        if len(self.memory) < self.capacity:
+            self.memory.append(None)
+
+        self.memory[self.position] = Transition(state, action, next_state, reward)
+        self.errors[self.position] = np.max(self.errors)
+
+        self.position = (self.position + 1) % self.capacity
+
+    def sample(self, batch_size):
+        batch_size = np.min([batch_size, len(self.memory)])
+
+        #indexes = np.random.(0, len(self), batch_size, p=)
+
+
+
+
+        return random.sample(self.memory, batch_size)
+
+    def update(self, indexes):
+        pass
+
+    def __len__(self):
+        return len(self.memory)
 
 
 class ReplayMemoryRecurrent(object):

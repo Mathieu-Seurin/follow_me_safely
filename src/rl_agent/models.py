@@ -13,7 +13,9 @@ class FullyConnectedModel(nn.Module):
         super().__init__()
 
         self.output_size = n_action.n
-        self.n_hidden_mlp = config["n_mlp_hidden"]
+
+        self.n_hidden_mlp1 = config["n_mlp_hidden1"]
+        self.n_hidden_mlp2 = config["n_mlp_hidden2"]
 
         if isinstance(state_dim, gym.spaces.Box):
             self.n_input = np.product(state_dim.shape)
@@ -22,8 +24,11 @@ class FullyConnectedModel(nn.Module):
 
         self.additionnal_input_size = 0
 
-        self.hidden_layer = nn.Linear(self.n_input+self.additionnal_input_size, self.n_hidden_mlp)
-        self.out_layer = nn.Linear(self.n_hidden_mlp, self.output_size)
+        self.hidden_layer1 = nn.Linear(self.n_input + self.additionnal_input_size, self.n_hidden_mlp1)
+        self.hidden_layer2 = nn.Linear(self.n_hidden_mlp1, self.n_hidden_mlp2)
+
+
+        self.out_layer = nn.Linear(self.n_hidden_mlp2, self.output_size)
 
     def forward(self, x):
 
@@ -32,7 +37,8 @@ class FullyConnectedModel(nn.Module):
         batch_size = x.size(0)
         x = x.view(batch_size, -1)
 
-        x = F.relu(self.hidden_layer(x))
+        x = F.relu(self.hidden_layer1(x))
+        x = F.relu(self.hidden_layer2(x))
         x = self.out_layer(x)
 
         return x
