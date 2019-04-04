@@ -1,7 +1,8 @@
 {
-  "name": "CartPole-v0",
+  "name": "CarRacing-v0",
   "stop" : {
     "episode_reward_mean" : 100,
     "episodes_total" : 1000
   }
 }
+

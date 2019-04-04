@@ -1,35 +1,34 @@
 {
-  "name": "dqn_mlp_agent_cart_after_mem_fix_and_update_tweak21",
+  "name": "dqn_mlp_agent_cart_fixed_up_longer_eps",
 
   "agent_type" : "dqn",
-  "discount_factor": 0.99,
+  "discount_factor": 0.999,
 
   "dqn_params": {
 
     "model_type" : "fc",
 
     "model_params": {
-      "n_mlp_hidden1": 24,
-      "n_mlp_hidden2" : 24
+      "n_mlp_hidden": 10
     },
 
     "memory" : "normal",
     "memory_size": 10000,
 
     "clamp_grad": true,
-    "optimizer": "adam",
-    "learning_rate": 1e-3,
-    "batch_size": 64,
+    "optimizer": "rmsprop",
+    "learning_rate": 6e-3,
+    "batch_size": 128,
 
     "exploration_method": {
       "name" : "eps_greedy",
       "begin_eps" : 1,
-      "expected_step_explo" : 10000,
-      "epsilon_minimum" : 0.01
+      "expected_step_explo" : 4000,
+      "epsilon_minimum" : 0.05
 
     },
 
-    "tau": 0.1,
-    "soft_update": false
+    "update_every_n_ep" : 40
+
   }
 }

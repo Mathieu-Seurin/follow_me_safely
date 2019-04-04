@@ -2,6 +2,7 @@ import gym
 import numpy as np
 
 from collections import OrderedDict
+from itertools import product
 
 class PreprocessWrapperPytorch(gym.core.ObservationWrapper):
     def __init__(self, env):
@@ -43,3 +44,20 @@ class ObsSpaceWrapper(gym.core.ObservationWrapper):
         ordered_obs['image'] = obs['image']
         ordered_obs['direction'] = obs['direction']
         return ordered_obs
+
+
+class CarActionWrapper(gym.core.ActionWrapper):
+
+    def __init__(self, env):
+        super().__init__(env)
+
+        self.action_map = np.array(
+            [k for k in product([-1, 0, 1], [1, 0], [0.2, 0])]
+        )
+        self.action_space = gym.spaces.Discrete(len(self.action_map))
+
+
+    def action(self, action):
+        a = self.action_map[action]
+        return self._action(a)
+

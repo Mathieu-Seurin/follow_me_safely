@@ -34,7 +34,7 @@
       "epsilon_minimum" : 0.04
 
     },
-    "tau": 0.001,
-    "soft_update": false
+
+    "update_every_n_ep" : 40
   }
 }

@@ -6,8 +6,6 @@ from ray.rllib.models import ModelCatalog, Model
 import tensorflow as tf
 import sonnet as snt
 
-from rl_agent.model_utils import get_init_conv, get_init_mlp
-
 from env_tools.wrapper import ObsSpaceWrapper
 
 def env_basic_creator(env_name):
@@ -58,6 +56,19 @@ class ConvPolicy(Model):
 
         return fc, feat_stem
 
+
+
+def get_init_conv():
+    return {
+        "w": tf.contrib.layers.xavier_initializer_conv2d(),
+        "b": tf.truncated_normal_initializer(stddev=1.0)
+    }
+
+def get_init_mlp():
+    return {
+        "w": tf.contrib.layers.xavier_initializer(),
+        "b": tf.truncated_normal_initializer(stddev=1.0)
+    }
 
 
 ModelCatalog.register_custom_model("conv_policy", ConvPolicy)

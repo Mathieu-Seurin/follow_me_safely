@@ -4,10 +4,11 @@ import gym.wrappers
 from env_tools.wrapper import PreprocessWrapperPytorch
 
 from config import load_config
-from rl_agent.dqn_agent import DQNAgent, FullRandomAgent
+from rl_agent.dqn_agent import DQNAgent
 
 import tensorboardX
 import numpy as np
+import torch
 
 parser = argparse.ArgumentParser('Log Parser arguments!')
 
@@ -32,13 +33,7 @@ full_config, expe_path = load_config(env_config_file=args.env_config,
 writer = tensorboardX.SummaryWriter(expe_path)
 log_every = 100
 
-if "minigrid" in full_config["env_name"]:
-    game = PreprocessWrapperPytorch(gym.make(full_config["env_name"]))
-else:
-    game = gym.make(full_config["env_name"])
-
-#game = gym.wrappers.Monitor(game, directory=expe_path, force=True)
-
+game = gym.make(full_config["env_name"])
 
 episodes = full_config["stop"]["episodes_total"]
 score_success = full_config["stop"]["episode_reward_mean"]
@@ -57,12 +52,12 @@ if model_type == "dqn" :
                      n_action=game.action_space,
                      state_dim=game.observation_space,
                      discount_factor=discount_factor)
-elif model_type == "random" :
-    model = FullRandomAgent(config=full_config, n_action=game.action_space, state_dim=game.observation_space)
+else:
+    raise NotImplementedError("{} not available for model".format(full_config["agent_type"]))
 
 
 for num_episode in range(1, episodes):
-    state = game.reset()
+    state = torch.FloatTensor(game.reset()).unsqueeze(0)
     #game.render()
     done = False
     iter_this_ep = 0
@@ -71,14 +66,17 @@ for num_episode in range(1, episodes):
 
     while not done:
 
-        action = model.forward(state)
-        next_state, reward, done, info = game.step(action=action)
+        action = model.select_action(state)
+        next_state, reward, done, info = game.step(action=action.item())
+
+        reward = torch.FloatTensor([reward])
+        next_state = torch.FloatTensor(next_state).unsqueeze(0)
 
         #game.render()
         if done:
             next_state = None
 
-        model.push(state, action, next_state, reward)
+        model.push(state.to('cpu'), action, next_state, reward)
         model.optimize()
 
         state = next_state
@@ -92,19 +90,25 @@ for num_episode in range(1, episodes):
         if done:
             model.callback(epoch=num_episode)
 
-            reward_undiscount_list.append(reward_total_not_discounted)
-            reward_discount_list.append(reward_total_discounted)
+            reward_undiscount_list.append(reward_total_not_discounted.item())
+            reward_discount_list.append(reward_total_discounted.item())
 
             # todo create logging
-            if num_episode%100 == 0:
-                print("Reward at the end of ep #{}, n_timesteps {}, discounted rew : {} undiscounted : {}, current_eps {}".format(
-                    num_episode, total_iter, reward_total_discounted, reward_total_not_discounted, model.current_eps))
+            if num_episode%20 == 0:
 
-                writer.add_scalar("data/sum_reward_discounted", np.mean(reward_discount_list), total_iter)
-                writer.add_scalar("data/sum_reward_not_discounted", np.mean(reward_undiscount_list), total_iter)
+                reward_discount_mean = np.mean(reward_discount_list)
+                reward_undiscount_mean = np.mean(reward_undiscount_list)
+
+                print("Reward at the end of ep #{}, n_timesteps {}, discounted rew : {} undiscounted : {}, current_eps {}".format(
+                    num_episode, total_iter, reward_discount_mean, reward_undiscount_mean, model.current_eps))
+
+                writer.add_scalar("data/sum_reward_discounted", reward_discount_mean, total_iter)
+                writer.add_scalar("data/sum_reward_not_discounted", reward_undiscount_mean, total_iter)
                 writer.add_scalar("data/iter_per_ep", iter_this_ep, total_iter)
                 writer.add_scalar("data/epsilon", model.current_eps, total_iter)
                 writer.add_scalar("data/model_update", model.num_update, total_iter)
+                writer.add_scalar("data/model_update_ep", model.num_update, num_episode)
+
 
             reward_undiscount_list = []
             reward_discount_list = []
