@@ -1,7 +1,7 @@
 {
   "name": "CartPole-v0",
   "stop" : {
-    "episode_reward_mean" : 100,
+    "episode_reward_mean" : 200,
     "episodes_total" : 1000
   }
 }

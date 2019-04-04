@@ -42,6 +42,9 @@ discount_factor = full_config["discount_factor"]
 total_iter = 0
 success_count = 0
 
+num_episode = 0
+early_stopping = False
+
 reward_undiscount_list = []
 reward_discount_list = []
 
@@ -56,9 +59,9 @@ else:
     raise NotImplementedError("{} not available for model".format(full_config["agent_type"]))
 
 
-for num_episode in range(1, episodes):
+while num_episode < episodes and not early_stopping :
     state = torch.FloatTensor(game.reset()).unsqueeze(0)
-    #game.render()
+    #game.render('human')
     done = False
     iter_this_ep = 0
     reward_total_discounted = 0
@@ -87,41 +90,35 @@ for num_episode in range(1, episodes):
         reward_total_discounted += reward * (discount_factor ** iter_this_ep)
         reward_total_not_discounted += reward
 
-        if done:
-            model.callback(epoch=num_episode)
 
-            reward_undiscount_list.append(reward_total_not_discounted.item())
-            reward_discount_list.append(reward_total_discounted.item())
+    # DONE GO HERE :
+    model.callback(epoch=num_episode)
 
-            # todo create logging
-            if num_episode%20 == 0:
+    reward_undiscount_list.append(reward_total_not_discounted.item())
+    reward_discount_list.append(reward_total_discounted.item())
 
-                reward_discount_mean = np.mean(reward_discount_list)
-                reward_undiscount_mean = np.mean(reward_undiscount_list)
+    if reward_total_discounted > score_success:
+        success_count += 1
+        if success_count > 5:
+            early_stopping = True
+    else:
+        success_count = 0
 
-                print("Reward at the end of ep #{}, n_timesteps {}, discounted rew : {} undiscounted : {}, current_eps {}".format(
-                    num_episode, total_iter, reward_discount_mean, reward_undiscount_mean, model.current_eps))
+    if num_episode % 20 == 0 or early_stopping:
+        reward_discount_mean = np.mean(reward_discount_list)
+        reward_undiscount_mean = np.mean(reward_undiscount_list)
 
-                writer.add_scalar("data/sum_reward_discounted", reward_discount_mean, total_iter)
-                writer.add_scalar("data/sum_reward_not_discounted", reward_undiscount_mean, total_iter)
-                writer.add_scalar("data/iter_per_ep", iter_this_ep, total_iter)
-                writer.add_scalar("data/epsilon", model.current_eps, total_iter)
-                writer.add_scalar("data/model_update", model.num_update, total_iter)
-                writer.add_scalar("data/model_update_ep", model.num_update, num_episode)
+        print(
+            "Reward at the end of ep #{}, n_timesteps {}, discounted rew : {} undiscounted : {}, current_eps {}".format(
+                num_episode, total_iter, reward_discount_mean, reward_undiscount_mean, model.current_eps))
 
+        writer.add_scalar("data/sum_reward_discounted", reward_discount_mean, total_iter)
+        writer.add_scalar("data/sum_reward_not_discounted", reward_undiscount_mean, total_iter)
+        writer.add_scalar("data/iter_per_ep", iter_this_ep, total_iter)
+        writer.add_scalar("data/epsilon", model.current_eps, total_iter)
+        writer.add_scalar("data/model_update", model.num_update, total_iter)
+        writer.add_scalar("data/model_update_ep", model.num_update, num_episode)
 
-            reward_undiscount_list = []
-            reward_discount_list = []
-
-            if reward_total_discounted > score_success:
-                success_count += 1
-            else:
-                success_count = 0
-
-    #print("Steps iter main {}, iter in model {}, eps {}".format(total_iter, model.n_step_eps, model.current_eps))
-
-    if success_count > 5:
-        break
-
+    num_episode += 1
 
 print("Experiment over")
