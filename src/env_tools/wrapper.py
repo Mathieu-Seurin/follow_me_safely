@@ -77,13 +77,17 @@ class FrameStackWrapperList(gym.Wrapper):
             extended_shape = (n_frameskip, *base_shape)
             self.observation_space = gym.spaces.Box(low=0, high=1, shape=extended_shape)
 
-        self.empty_image = np.zeros(1, *env.observation_space.shape)
+        self.empty_image = np.zeros((1, *env.observation_space.shape))
         self.empty_feedback = 0
 
     def stack(self, obs_list):
+        """
+        Concatenate obs on the first dimension
+        """
         if isinstance(obs_list[0], np.ndarray):
-            return np.concatenate(obs_list)
+            return np.concatenate([np.expand_dims(obs,0) for obs in obs_list])
         elif isinstance(obs_list[0], dict):
+            raise NotImplementedError("Need to check feedback, if stack on dim=0 or 1")
             stacked_obs = dict()
             for key in obs_list.keys():
                 stacked_obs[key] = np.concatenate([obs[key] for obs in obs_list])
@@ -103,3 +107,11 @@ class FrameStackWrapperList(gym.Wrapper):
                 break
 
         return self.stack(stacked_obs), sum_reward, done, None
+
+    def reset(self):
+        """
+        Beginning observation is a duplicate of the starting frame
+        (to avoid having black frame at the beginning)
+        """
+        obs = super().reset()
+        return self.stack([obs] * self.n_frameskip)
