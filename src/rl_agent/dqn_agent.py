@@ -16,6 +16,7 @@ class DQNAgent(object):
         self.n_action = n_action.n
 
         self.lr = config["learning_rate"]
+        self.weight_decay = config["weight_decay"]
         self.batch_size = config["batch_size"]
 
         self.memory = ReplayMemory(config["memory_size"])
@@ -32,8 +33,7 @@ class DQNAgent(object):
 
         self.target_net.eval()
 
-
-        self.optimizer = torch.optim.RMSprop(self.policy_net.parameters(), lr=self.lr)
+        self.optimizer = torch.optim.RMSprop(self.policy_net.parameters(), lr=self.lr, weight_decay=self.weight_decay)
 
         if config["exploration_method"]["name"] == "eps_greedy":
 

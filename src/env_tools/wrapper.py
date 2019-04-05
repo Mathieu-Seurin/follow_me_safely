@@ -61,3 +61,45 @@ class CarActionWrapper(gym.core.ActionWrapper):
         a = self.action_map[action]
         return self._action(a)
 
+
+class FrameStackWrapperList(gym.Wrapper):
+
+    def __init__(self, env, n_frameskip=3):
+        self.n_frameskip = n_frameskip
+
+        assert self.n_frameskip > 1, "Frameskip is useless"
+        super(FrameStackWrapperList, self).__init__(env)
+
+        if isinstance(env.observation_space, gym.spaces.Dict):
+            raise NotImplementedError("Todo later")
+        else:
+            base_shape = env.observation_space.shape
+            extended_shape = (n_frameskip, *base_shape)
+            self.observation_space = gym.spaces.Box(low=0, high=1, shape=extended_shape)
+
+        self.empty_image = np.zeros(1, *env.observation_space.shape)
+        self.empty_feedback = 0
+
+    def stack(self, obs_list):
+        if isinstance(obs_list[0], np.ndarray):
+            return np.concatenate(obs_list)
+        elif isinstance(obs_list[0], dict):
+            stacked_obs = dict()
+            for key in obs_list.keys():
+                stacked_obs[key] = np.concatenate([obs[key] for obs in obs_list])
+            return stacked_obs
+
+    def step(self, action):
+        sum_reward = 0
+        stacked_obs = []
+
+        for current_frame in range(self.n_frameskip):
+            obs, reward, done, _ = super().step(action)
+            sum_reward += reward
+            stacked_obs.append(obs)
+
+            if done:
+                stacked_obs.extend(self.empty_feedback * (self.n_frameskip - len(stacked_obs)))
+                break
+
+        return self.stack(stacked_obs), sum_reward, done, None

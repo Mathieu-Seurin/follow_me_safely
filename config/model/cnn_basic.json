@@ -2,30 +2,32 @@
   "name": "dqn_conv_agent_prio",
 
   "agent_type" : "dqn",
-  "discount_factor": 0.99,
+  "discount_factor": 0.95,
 
   "dqn_params": {
 
     "model_type" : "conv",
 
     "model_params": {
-      "n_layers" : 3,
-      "out_channels" : [16,32,64],
-      "kernel_size" : [2,2,2],
-      "pooling" : [2],
+      "n_layers" : 2,
+      "out_channels" : [8,16],
+      "kernel_size" : [7,3],
+      "pooling" : [2, 2],
 
-      "n_mlp_hidden" : 64,
+      "n_mlp_hidden" : 256,
       "use_memory" : false
 
     },
 
-    "memory" : "prioritized",
-    "memory_size": 50000,
+    "memory" : "simple",
+    "memory_size": 40000,
 
     "clamp_grad": true,
     "optimizer": "rmsprop",
     "learning_rate": 5e-4,
-    "batch_size": 128,
+    "weight_decay" : 0,
+
+    "batch_size": 64,
 
     "exploration_method": {
       "name" : "eps_greedy",
@@ -35,6 +37,6 @@
 
     },
 
-    "update_every_n_ep" : 40
+    "update_every_n_ep" : 1000
   }
 }
