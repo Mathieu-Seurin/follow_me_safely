@@ -11,6 +11,9 @@ import torch
 
 import os
 
+import matplotlib.pyplot as plt
+
+
 from xvfbwrapper import Xvfb
 display = Xvfb(width=100, height=100, colordepth=16)
 
@@ -56,12 +59,14 @@ if model_type == "dqn" :
     model = DQNAgent(config=full_config["dqn_params"],
                      n_action=game.action_space,
                      state_dim=game.observation_space,
-                     discount_factor=discount_factor)
+                     discount_factor=discount_factor,
+                     biased_sampling=full_config["biased_sampling"])
 else:
     raise NotImplementedError("{} not available for model".format(full_config["agent_type"]))
 
 
-model = model.policy_net.load_dict(os.path.join(expe_path, 'best_model.pth'))
+model.policy_net.load_state_dict(torch.load(os.path.join(expe_path, 'best_model.pth')))
+print(expe_path)
 
 with display as xvfb:
 
@@ -77,6 +82,16 @@ with display as xvfb:
 
             action = model.select_action_greedy(state)
             next_state, reward, done, info = game.step(action=action.item())
+
+            plt.imshow(game._unconvert(next_state[0, :, :]))
+            plt.savefig(os.path.join(expe_path, 'test_ep{:03d}_step{:04d}_f1'.format(num_episode, iter_this_ep)))
+            plt.close()
+            plt.imshow(game._unconvert(next_state[1, :, :]))
+            plt.savefig(os.path.join(expe_path, 'test_ep{:03d}_step{:04d}_f2'.format(num_episode, iter_this_ep)))
+            plt.close()
+            plt.imshow(game._unconvert(next_state[2, :, :]))
+            plt.savefig(os.path.join(expe_path, 'test_ep{:03d}_step{:04d}_f3'.format(num_episode, iter_this_ep)))
+            plt.close()
 
             reward = torch.FloatTensor([reward])
             next_state = torch.FloatTensor(next_state).unsqueeze(0)

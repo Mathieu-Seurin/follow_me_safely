@@ -128,7 +128,7 @@ def set_seed(seed):
         print('Using seed {}'.format(seed))
         np.random.seed(seed)
         torch.manual_seed(seed)
-        random.seed(seed)
+        # random.seed(seed)
     else:
         raise NotImplementedError("Cannot set negative seed")
 

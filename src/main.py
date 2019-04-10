@@ -72,7 +72,8 @@ if model_type == "dqn" :
     model = DQNAgent(config=full_config["dqn_params"],
                      n_action=game.action_space,
                      state_dim=game.observation_space,
-                     discount_factor=discount_factor)
+                     discount_factor=discount_factor,
+                     biased_sampling=full_config["biased_sampling"])
 else:
     raise NotImplementedError("{} not available for model".format(full_config["agent_type"]))
 

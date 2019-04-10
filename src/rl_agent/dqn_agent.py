@@ -10,7 +10,7 @@ from rl_agent.gpu_utils import TORCH_DEVICE
 
 class DQNAgent(object):
 
-    def __init__(self, config, n_action, state_dim, discount_factor):
+    def __init__(self, config, n_action, state_dim, discount_factor, biased_sampling):
 
         self.discount_factor = discount_factor
         self.n_action = n_action.n
@@ -43,6 +43,12 @@ class DQNAgent(object):
             self.expected_exploration_steps = config["exploration_method"]["expected_step_explo"]
             self.minimum_epsilon = config["exploration_method"]["epsilon_minimum"]
             self.n_step_eps = 0
+
+            self.biased_sampling = biased_sampling
+            self.action_proba = np.zeros(self.n_action)
+            self.action_proba[1], self.action_proba[5], self.action_proba[9] = 1, 1, 1
+            self.action_proba = self.action_proba * 14 + 1
+            self.action_proba /= np.sum(self.action_proba)
 
         else:
             raise NotImplementedError("Boltzman explo not available ({})".format(config["exploration_method"]["name"]))
@@ -79,7 +85,12 @@ class DQNAgent(object):
                 qs = self.policy_net(state.to(TORCH_DEVICE))
                 return qs.max(1)[1].view(1, 1).to('cpu')
         else:
-            return torch.tensor([[np.random.randint(self.n_action)]], dtype=torch.long)
+            if self.biased_sampling:
+                act = np.random.choice(self.n_action, p=self.action_proba)
+                return torch.tensor([[act]], dtype=torch.long)
+            else:
+                return torch.tensor([[np.random.randint(self.n_action)]], dtype=torch.long)
+
 
     def push(self, *args):
         self.memory.push(*args)

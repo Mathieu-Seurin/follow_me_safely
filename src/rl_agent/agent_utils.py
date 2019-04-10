@@ -3,7 +3,7 @@ from collections import namedtuple
 
 import torch
 import torch.nn as nn
-import random
+
 import logging
 
 
@@ -25,7 +25,7 @@ class ReplayMemory(object):
         self.position = (self.position + 1) % self.capacity
 
     def sample(self, batch_size):
-        return random.sample(self.memory, batch_size)
+        return [self.memory[sample] for sample in np.random.choice(len(self), batch_size)]
 
     def __len__(self):
         return len(self.memory)
