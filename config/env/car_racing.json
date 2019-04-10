@@ -1,5 +1,7 @@
 {
   "name": "CarRacing-v0",
+  "wrappers" : ["action", "frameskip"],
+
   "stop" : {
     "episode_reward_mean" : 100,
     "episodes_total" : 1000

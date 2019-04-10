@@ -1,7 +1,7 @@
 import argparse
 
 import gym.wrappers
-from env_tools.wrapper import PreprocessWrapperPytorch
+from env_tools.wrapper import PreprocessWrapperPytorch, FrameStackWrapper, CarActionWrapper
 
 from config import load_config
 from rl_agent.dqn_agent import DQNAgent
@@ -9,6 +9,9 @@ from rl_agent.dqn_agent import DQNAgent
 import tensorboardX
 import numpy as np
 import torch
+
+from xvfbwrapper import Xvfb
+display = Xvfb(width=100, height=100, colordepth=16)
 
 parser = argparse.ArgumentParser('Log Parser arguments!')
 
@@ -33,7 +36,19 @@ full_config, expe_path = load_config(env_config_file=args.env_config,
 writer = tensorboardX.SummaryWriter(expe_path)
 log_every = 100
 
+
+# if "car" in full_config["env_name"].lower():
+#     game =
+# else:
+
 game = gym.make(full_config["env_name"])
+
+# Apply wrapper necessary to the env
+wrapper_translate = dict([("frameskip", FrameStackWrapper), ("action", CarActionWrapper)])
+if full_config.get("wrappers", False):
+    for wrap_key in full_config["wrappers"]:
+        game = wrapper_translate[wrap_key](game)
+
 
 episodes = full_config["stop"]["episodes_total"]
 score_success = full_config["stop"]["episode_reward_mean"]
@@ -58,67 +73,68 @@ if model_type == "dqn" :
 else:
     raise NotImplementedError("{} not available for model".format(full_config["agent_type"]))
 
+with display as xvfb:
 
-while num_episode < episodes and not early_stopping :
-    state = torch.FloatTensor(game.reset()).unsqueeze(0)
-    #game.render('human')
-    done = False
-    iter_this_ep = 0
-    reward_total_discounted = 0
-    reward_total_not_discounted = 0
+    while num_episode < episodes and not early_stopping :
+        state = torch.FloatTensor(game.reset()).unsqueeze(0)
+        #game.render('human')
+        done = False
+        iter_this_ep = 0
+        reward_total_discounted = 0
+        reward_total_not_discounted = 0
 
-    while not done:
+        while not done:
 
-        action = model.select_action(state)
-        next_state, reward, done, info = game.step(action=action.item())
+            action = model.select_action(state)
+            next_state, reward, done, info = game.step(action=action.item())
 
-        reward = torch.FloatTensor([reward])
-        next_state = torch.FloatTensor(next_state).unsqueeze(0)
+            reward = torch.FloatTensor([reward])
+            next_state = torch.FloatTensor(next_state).unsqueeze(0)
 
-        #game.render()
-        if done:
-            next_state = None
+            #game.render()
+            if done:
+                next_state = None
 
-        model.push(state.to('cpu'), action, next_state, reward)
-        model.optimize()
+            model.push(state.to('cpu'), action, next_state, reward)
+            model.optimize()
 
-        state = next_state
+            state = next_state
 
-        total_iter += 1
-        iter_this_ep = iter_this_ep + 1
+            total_iter += 1
+            iter_this_ep = iter_this_ep + 1
 
-        reward_total_discounted += reward * (discount_factor ** iter_this_ep)
-        reward_total_not_discounted += reward
+            reward_total_discounted += reward * (discount_factor ** iter_this_ep)
+            reward_total_not_discounted += reward
 
 
-    # DONE GO HERE :
-    model.callback(epoch=num_episode)
+        # DONE GO HERE :
+        model.callback(epoch=num_episode)
 
-    reward_undiscount_list.append(reward_total_not_discounted.item())
-    reward_discount_list.append(reward_total_discounted.item())
+        reward_undiscount_list.append(reward_total_not_discounted.item())
+        reward_discount_list.append(reward_total_discounted.item())
 
-    if reward_total_discounted > score_success:
-        success_count += 1
-        if success_count > 5:
-            early_stopping = True
-    else:
-        success_count = 0
+        if reward_total_discounted > score_success:
+            success_count += 1
+            if success_count > 5:
+                early_stopping = True
+        else:
+            success_count = 0
 
-    if num_episode % 20 == 0 or early_stopping:
-        reward_discount_mean = np.mean(reward_discount_list)
-        reward_undiscount_mean = np.mean(reward_undiscount_list)
+        if num_episode % 20 == 0 or early_stopping:
+            reward_discount_mean = np.mean(reward_discount_list)
+            reward_undiscount_mean = np.mean(reward_undiscount_list)
 
-        print(
-            "Reward at the end of ep #{}, n_timesteps {}, discounted rew : {} undiscounted : {}, current_eps {}".format(
-                num_episode, total_iter, reward_discount_mean, reward_undiscount_mean, model.current_eps))
+            print(
+                "Reward at the end of ep #{}, n_timesteps {}, discounted rew : {} undiscounted : {}, current_eps {}".format(
+                    num_episode, total_iter, reward_discount_mean, reward_undiscount_mean, model.current_eps))
 
-        writer.add_scalar("data/sum_reward_discounted", reward_discount_mean, total_iter)
-        writer.add_scalar("data/sum_reward_not_discounted", reward_undiscount_mean, total_iter)
-        writer.add_scalar("data/iter_per_ep", iter_this_ep, total_iter)
-        writer.add_scalar("data/epsilon", model.current_eps, total_iter)
-        writer.add_scalar("data/model_update", model.num_update, total_iter)
-        writer.add_scalar("data/model_update_ep", model.num_update, num_episode)
+            writer.add_scalar("data/sum_reward_discounted", reward_discount_mean, total_iter)
+            writer.add_scalar("data/sum_reward_not_discounted", reward_undiscount_mean, total_iter)
+            writer.add_scalar("data/iter_per_ep", iter_this_ep, total_iter)
+            writer.add_scalar("data/epsilon", model.current_eps, total_iter)
+            writer.add_scalar("data/model_update", model.num_update, total_iter)
+            writer.add_scalar("data/model_update_ep", model.num_update, num_episode)
 
-    num_episode += 1
+        num_episode += 1
 
-print("Experiment over")
+    print("Experiment over")

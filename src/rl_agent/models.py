@@ -35,7 +35,10 @@ class ConvModel(nn.Module):
         self.output_size = n_action.n
         self.n_hidden_mlp = config["n_mlp_hidden"]
 
-        self.input_shape = state_dim.spaces["image"].shape
+        if isinstance(state_dim, gym.spaces.Box):
+            self.input_shape = state_dim.shape
+        else:
+            self.input_shape = state_dim.spaces["image"].shape
 
         self.additionnal_input_size = 0
 
@@ -44,7 +47,7 @@ class ConvModel(nn.Module):
         in_channels = self.input_shape[0] # Because image are (N_FEAT_MAP,h,w) as usual
 
         # todo : check size
-        for layer in range(config["n_layers"]) :
+        for layer in range(config["n_layers"]):
 
             # CONV -> RELU -> (Optionnal MaxPooling)
             out_channels = config["out_channels"][layer]
