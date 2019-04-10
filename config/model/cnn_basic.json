@@ -1,5 +1,5 @@
 {
-  "name": "dqn_conv_agent_update_20",
+  "name": "dqn_conv_agent_update_4",
 
   "agent_type" : "dqn",
   "discount_factor": 0.999,

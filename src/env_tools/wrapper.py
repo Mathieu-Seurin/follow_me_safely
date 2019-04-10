@@ -65,7 +65,7 @@ class CarActionWrapper(gym.core.ActionWrapper):
 
 class FrameStackWrapper(gym.Wrapper):
 
-    def __init__(self, env, n_frameskip=3):
+    def __init__(self, env, n_frameskip=3, early_reset=True):
         self.n_frameskip = n_frameskip
 
         assert self.n_frameskip > 1, "Frameskip is useless"
@@ -83,6 +83,8 @@ class FrameStackWrapper(gym.Wrapper):
 
         self.frames_before_zoom_end = 48 # Number of step for the zoom to end, fuck this shit.
 
+        self.early_reset = early_reset
+        self.min_reward_before_reset = 12
 
     def convert(self, frame):
         """
@@ -115,12 +117,16 @@ class FrameStackWrapper(gym.Wrapper):
         else:
             raise NotImplementedError("Problem in obs list")
 
+    def check_early_reset(self, reward):
+        pass
+
     def step(self, action):
         sum_reward = 0
         stacked_obs = []
 
         for current_frame in range(self.n_frameskip):
             obs, reward, done, _ = super().step(action)
+
             sum_reward += reward
             stacked_obs.append(self.convert(obs))
 
@@ -129,6 +135,9 @@ class FrameStackWrapper(gym.Wrapper):
             if done:
                 stacked_obs.extend([self.empty_image] * (self.n_frameskip - len(stacked_obs)))
                 break
+
+        if self.early_reset:
+            self.check_early_reset(sum_reward)
 
         array_obs = self.stack(stacked_obs)
         assert self.observation_space.contains(array_obs), "Problem, observation don't match observation space."
@@ -144,8 +153,16 @@ class FrameStackWrapper(gym.Wrapper):
         super().reset()
         dont_move_action = self.env.dont_move_action
 
+        # Don't apply early reset when initializing
+        early_reset = self.early_reset
+        self.early_reset = False
+
         for _ in range(self.frames_before_zoom_end):
             obs, rew, done, info = self.step(dont_move_action)
+
+        # Re-apply early reset
+        self.early_reset = early_reset
+        self.reward_neg_counter = 0
 
         self.render('rgb_array')
         return obs
@@ -153,39 +170,41 @@ class FrameStackWrapper(gym.Wrapper):
 
 if __name__ == "__main__" :
 
-    from xvfbwrapper import Xvfb
+    #from xvfbwrapper import Xvfb
     import matplotlib.pyplot as plt
     from skimage import data
     import time
 
-    with Xvfb(width=100, height=100, colordepth=16) as disp:
-        game = gym.make("CarRacing-v0")
+    #with Xvfb(width=100, height=100, colordepth=16) as disp:
+    game = gym.make("CarRacing-v0")
 
-        game = CarActionWrapper(game)
-        game = FrameStackWrapper(game)
+    game = CarActionWrapper(game)
+    game = FrameStackWrapper(game)
 
-        init_time = time.time()
-        game.reset()
-        print("Time taken to init in seconds :", time.time() - init_time)
+    init_time = time.time()
+    game.reset()
+    print("Time taken to init in seconds :", time.time() - init_time)
 
-        init_time = time.time()
+    init_time = time.time()
 
-        done = False
-        step = 0
+    done = False
+    step = 0
 
-        while not done:
-            a = game.action_space.sample()
-            obs, rew, done, _ = game.step(a)
+    while not done:
+        a = game.action_space.sample()
+        obs, rew, done, _ = game.step(a)
 
-            assert obs.shape == (3,96,96)
+        print(rew)
 
-            # plt.imshow(game._unconvert(obs[0, :, :]))
-            # plt.savefig('test{:04d}1'.format(step))
-            # plt.imshow(game._unconvert(obs[1, :, :]))
-            # plt.savefig('test{:04d}2'.format(step))
-            # plt.imshow(game._unconvert(obs[2, :, :]))
-            # plt.savefig('test{:04d}3'.format(step))
+        assert obs.shape == (3,96,96)
 
-            step += 1
+        # plt.imshow(game._unconvert(obs[0, :, :]))
+        # plt.savefig('test{:04d}1'.format(step))
+        # plt.imshow(game._unconvert(obs[1, :, :]))
+        # plt.savefig('test{:04d}2'.format(step))
+        # plt.imshow(game._unconvert(obs[2, :, :]))
+        # plt.savefig('test{:04d}3'.format(step))
 
-        print("FPS = ", (step*3) / (time.time() - init_time))
+        step += 1
+
+    print("FPS = ", (step*3) / (time.time() - init_time))
