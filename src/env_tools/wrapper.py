@@ -76,7 +76,7 @@ class FrameStackWrapper(gym.Wrapper):
         else:
             base_shape = env.observation_space.shape[:2] # Deleting the channel because it's converted to grey
             extended_shape = (n_frameskip, *base_shape)
-            self.observation_space = gym.spaces.Box(low=0, high=1, shape=extended_shape)
+            self.observation_space = gym.spaces.Box(low=-1, high=1, shape=extended_shape)
 
         self.empty_image = np.zeros((1, *base_shape))
         self.empty_feedback = 0
@@ -130,7 +130,10 @@ class FrameStackWrapper(gym.Wrapper):
                 stacked_obs.extend([self.empty_image] * (self.n_frameskip - len(stacked_obs)))
                 break
 
-        return self.stack(stacked_obs), sum_reward, done, None
+        array_obs = self.stack(stacked_obs)
+        assert self.observation_space.contains(array_obs), "Problem, observation don't match observation space."
+
+        return array_obs, sum_reward, done, None
 
     def reset(self):
         """
@@ -145,8 +148,7 @@ class FrameStackWrapper(gym.Wrapper):
             obs, rew, done, info = self.step(dont_move_action)
 
         self.render('rgb_array')
-
-        return self.stack([obs] * self.n_frameskip)
+        return obs
 
 
 if __name__ == "__main__" :
@@ -171,9 +173,11 @@ if __name__ == "__main__" :
         done = False
         step = 0
 
-        while not done and step < 100:
+        while not done:
             a = game.action_space.sample()
             obs, rew, done, _ = game.step(a)
+
+            assert obs.shape == (3,96,96)
 
             # plt.imshow(game._unconvert(obs[0, :, :]))
             # plt.savefig('test{:04d}1'.format(step))

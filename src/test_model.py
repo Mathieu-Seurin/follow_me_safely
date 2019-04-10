@@ -6,7 +6,6 @@ from env_tools.wrapper import PreprocessWrapperPytorch, FrameStackWrapper, CarAc
 from config import load_config
 from rl_agent.dqn_agent import DQNAgent
 
-import tensorboardX
 import numpy as np
 import torch
 
@@ -35,13 +34,6 @@ full_config, expe_path = load_config(env_config_file=args.env_config,
                           seed=args.seed
                           )
 
-writer = tensorboardX.SummaryWriter(expe_path)
-log_every = 100
-
-
-# if "car" in full_config["env_name"].lower():
-#     game =
-# else:
 
 game = gym.make(full_config["env_name"])
 
@@ -52,20 +44,12 @@ if full_config.get("wrappers", False):
         game = wrapper_translate[wrap_key](game)
 
 
-episodes = full_config["stop"]["episodes_total"]
-score_success = full_config["stop"]["episode_reward_mean"]
+episodes = 5 # Number of episodes to see what the policy is doing.
 
 discount_factor = full_config["discount_factor"]
 total_iter = 0
-success_count = 0
 
 num_episode = 0
-early_stopping = False
-
-reward_undiscount_list = []
-reward_discount_list = []
-
-best_undiscount_reward = -float("inf")
 
 model_type = full_config["agent_type"]
 if model_type == "dqn" :
@@ -76,11 +60,14 @@ if model_type == "dqn" :
 else:
     raise NotImplementedError("{} not available for model".format(full_config["agent_type"]))
 
+
+model = model.policy_net.load_dict(os.path.join(expe_path, 'best_model.pth'))
+
 with display as xvfb:
 
-    while num_episode < episodes and not early_stopping :
+    while num_episode < episodes :
         state = torch.FloatTensor(game.reset()).unsqueeze(0)
-        #game.render('human')
+
         done = False
         iter_this_ep = 0
         reward_total_discounted = 0
@@ -88,18 +75,14 @@ with display as xvfb:
 
         while not done:
 
-            action = model.select_action(state)
+            action = model.select_action_greedy(state)
             next_state, reward, done, info = game.step(action=action.item())
 
             reward = torch.FloatTensor([reward])
             next_state = torch.FloatTensor(next_state).unsqueeze(0)
 
-            #game.render()
             if done:
                 next_state = None
-
-            model.push(state.to('cpu'), action, next_state, reward)
-            model.optimize()
 
             state = next_state
 
@@ -109,41 +92,9 @@ with display as xvfb:
             reward_total_discounted += reward * (discount_factor ** iter_this_ep)
             reward_total_not_discounted += reward
 
-
-        # DONE GO HERE :
-        model.callback(epoch=num_episode)
-
-        reward_undiscount_list.append(reward_total_not_discounted.item())
-        reward_discount_list.append(reward_total_discounted.item())
-
-        if reward_total_discounted > score_success:
-            success_count += 1
-            if success_count > 5:
-                early_stopping = True
-        else:
-            success_count = 0
-
-        if num_episode % 2 == 0 or early_stopping:
-            reward_discount_mean = np.mean(reward_discount_list)
-            reward_undiscount_mean = np.mean(reward_undiscount_list)
-
-            print(
-                "Reward at the end of ep #{}, n_timesteps {}, discounted rew : {} undiscounted : {}, current_eps {}".format(
-                    num_episode, total_iter, reward_discount_mean, reward_undiscount_mean, model.current_eps))
-
-            writer.add_scalar("data/sum_reward_discounted", reward_discount_mean, total_iter)
-            writer.add_scalar("data/sum_reward_not_discounted", reward_undiscount_mean, total_iter)
-            writer.add_scalar("data/iter_per_ep", iter_this_ep, total_iter)
-            writer.add_scalar("data/epsilon", model.current_eps, total_iter)
-            writer.add_scalar("data/model_update", model.num_update, total_iter)
-            writer.add_scalar("data/model_update_ep", model.num_update, num_episode)
-
-            if reward_discount_mean > best_undiscount_reward :
-                best_undiscount_reward = reward_discount_mean
-                torch.save(model.policy_net.state_dict(), os.path.join(expe_path,"best_model.pth"))
-                
-            torch.save(model.policy_net.state_dict(), os.path.join(expe_path, "last_model.pth"))
-
+        print(
+            "Reward at the end of ep #{}, n_timesteps {}, discounted rew : {} undiscounted : {}, current_eps {}".format(
+                num_episode, total_iter, reward_total_discounted.item(), reward_total_not_discounted.item(), model.current_eps))
 
 
         num_episode += 1

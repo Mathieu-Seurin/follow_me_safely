@@ -1,8 +1,8 @@
 {
-  "name": "dqn_conv_agent_prio",
+  "name": "dqn_conv_agent_bigger discount",
 
   "agent_type" : "dqn",
-  "discount_factor": 0.95,
+  "discount_factor": 0.999,
 
   "dqn_params": {
 

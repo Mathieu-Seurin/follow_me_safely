@@ -47,6 +47,18 @@ class DQNAgent(object):
         else:
             raise NotImplementedError("Boltzman explo not available ({})".format(config["exploration_method"]["name"]))
 
+    def select_action_greedy(self, state):
+
+        if np.random.random() > self.minimum_epsilon:
+            with torch.no_grad():
+                # t.max(1) will return largest column value of each row.
+                # second column on max result is index of where max element was
+                # found, so we pick action with the larger expected reward.
+                qs = self.policy_net(state.to(TORCH_DEVICE))
+                return qs.max(1)[1].view(1, 1).to('cpu')
+        else:
+            return torch.tensor([[np.random.randint(self.n_action)]], dtype=torch.long)
+
     def _select_action_eps_greedy(self, state):
 
         # Formula for eps decay :
