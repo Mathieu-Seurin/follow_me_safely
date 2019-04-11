@@ -84,13 +84,13 @@ with display as xvfb:
             next_state, reward, done, info = game.step(action=action.item())
 
             plt.imshow(game._unconvert(next_state[0, :, :]))
-            plt.savefig(os.path.join(expe_path, 'test_ep{:03d}_step{:04d}_f1'.format(num_episode, iter_this_ep)))
+            plt.savefig(os.path.join(expe_path, 'test_ep{:03d}_step{:04d}'.format(num_episode, iter_this_ep*3)))
             plt.close()
             plt.imshow(game._unconvert(next_state[1, :, :]))
-            plt.savefig(os.path.join(expe_path, 'test_ep{:03d}_step{:04d}_f2'.format(num_episode, iter_this_ep)))
+            plt.savefig(os.path.join(expe_path, 'test_ep{:03d}_step{:04d}'.format(num_episode, iter_this_ep*3+1)))
             plt.close()
             plt.imshow(game._unconvert(next_state[2, :, :]))
-            plt.savefig(os.path.join(expe_path, 'test_ep{:03d}_step{:04d}_f3'.format(num_episode, iter_this_ep)))
+            plt.savefig(os.path.join(expe_path, 'test_ep{:03d}_step{:04d}'.format(num_episode, iter_this_ep*3+2)))
             plt.close()
 
             reward = torch.FloatTensor([reward])

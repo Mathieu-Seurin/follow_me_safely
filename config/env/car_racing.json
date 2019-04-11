@@ -3,7 +3,7 @@
   "wrappers" : ["action", "frameskip"],
 
   "stop" : {
-    "episode_reward_mean" : 100,
+    "episode_reward_mean" : 700,
     "episodes_total" : 1000
   }
 }

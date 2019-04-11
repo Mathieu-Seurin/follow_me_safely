@@ -38,7 +38,7 @@ full_config, expe_path = load_config(env_config_file=args.env_config,
 writer = tensorboardX.SummaryWriter(expe_path)
 log_every = 100
 
-
+#
 # if "car" in full_config["env_name"].lower():
 #     game =
 # else:
