@@ -41,10 +41,10 @@ from pyglet import gl
 
 STATE_W = 96   # less than Atari 160x192
 STATE_H = 96
-VIDEO_W = 96*2
-VIDEO_H = 96*2
-WINDOW_W = 96*2
-WINDOW_H = 96*2
+VIDEO_W = 640
+VIDEO_H = 480
+WINDOW_W = 1920
+WINDOW_H = 1080
 
 SCALE       = 6.0        # Track scale
 TRACK_RAD   = 900/SCALE  # Track is heavily morphed circle with this radius
@@ -61,6 +61,16 @@ BORDER = 8/SCALE
 BORDER_MIN_COUNT = 4
 
 ROAD_COLOR = [0.4, 0.4, 0.4]
+
+
+def compute_border(x1, x2, y1, y2, beta1, beta2, side):
+    b1_l = (x1 + side * TRACK_WIDTH            * math.cos(beta1), y1 + side * TRACK_WIDTH            * math.sin(beta1))
+    b1_r = (x1 + side * (TRACK_WIDTH + BORDER) * math.cos(beta1), y1 + side * (TRACK_WIDTH + BORDER) * math.sin(beta1))
+    b2_l = (x2 + side * TRACK_WIDTH            * math.cos(beta2), y2 + side * TRACK_WIDTH            * math.sin(beta2))
+    b2_r = (x2 + side * (TRACK_WIDTH + BORDER) * math.cos(beta2), y2 + side * (TRACK_WIDTH + BORDER) * math.sin(beta2))
+
+    return b1_l, b1_r, b2_l, b2_r
+
 
 class FrictionDetector(contactListener):
     def __init__(self, env):
@@ -96,7 +106,7 @@ class FrictionDetector(contactListener):
                 self.env.tile_visited_count += 1
         else:
             obj.tiles.remove(tile)
-            #print tile.road_friction, "DEL", len(obj.tiles) -- should delete to zero when on grass (this works)
+            print(tile.road_friction, "DEL", len(obj.tiles)) # -- should delete to zero when on grass (this works)
 
 class CarRacing(gym.Env, EzPickle):
     metadata = {
@@ -274,7 +284,22 @@ class CarRacing(gym.Env, EzPickle):
                 b2_l = (x2 + side* TRACK_WIDTH        *math.cos(beta2), y2 + side* TRACK_WIDTH        *math.sin(beta2))
                 b2_r = (x2 + side*(TRACK_WIDTH+BORDER)*math.cos(beta2), y2 + side*(TRACK_WIDTH+BORDER)*math.sin(beta2))
                 self.road_poly.append(( [b1_l, b1_r, b2_r, b2_l], (1,1,1) if i%2==0 else (1,0,0) ))
+
+            # Test creating walls
+            b1_l, b1_r, b2_r, b2_l = compute_border(x1, x2, y1, y2, beta1, beta2, side=1)
+            self.world.CreateStaticBody(shapes=polygonShape(vertices=[b1_l, b1_r, b2_r, b2_l]), )
+
+            b1_l, b1_r, b2_r, b2_l = compute_border(x1, x2, y1, y2, beta1, beta2, side=-1)
+            self.world.CreateStaticBody(shapes=polygonShape(vertices=[b1_l, b1_r, b2_r, b2_l]), )
+
         self.track = track
+
+
+
+        wall_size = 0.01
+
+
+
         return True
 
     def reset(self):
@@ -486,7 +511,7 @@ if __name__=="__main__":
             s, r, done, info = env.step(a)
             total_reward += r
             if steps % 200 == 0 or done:
-                print("\naction " + str(["{:+0.2f}".format(x) for x in a]))
+                print("\naction " + str(["{:+0.2f}".format(x) for x in a])),
                 print("step {} total_reward {:+0.2f}".format(steps, total_reward))
                 #import matplotlib.pyplot as plt
                 #plt.imshow(s)

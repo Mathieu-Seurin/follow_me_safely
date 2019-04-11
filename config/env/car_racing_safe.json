@@ -1,0 +1,10 @@
+{
+  "name": "CarRacing-safe-v0",
+  "wrappers" : ["action", "frameskip"],
+
+  "stop" : {
+    "episode_reward_mean" : 700,
+    "episodes_total" : 1000
+  }
+}
+
