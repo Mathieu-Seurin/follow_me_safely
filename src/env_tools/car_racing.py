@@ -3,6 +3,7 @@ import numpy as np
 
 import Box2D
 from Box2D.b2 import (edgeShape, circleShape, fixtureDef, polygonShape, revoluteJointDef, contactListener)
+from Box2D import b2Vec2
 
 import gym
 from gym import spaces
@@ -85,6 +86,7 @@ class FrictionDetector(contactListener):
         obj = None
         u1 = contact.fixtureA.body.userData
         u2 = contact.fixtureB.body.userData
+
         if u1 and "road_friction" in u1.__dict__:
             tile = u1
             obj  = u2
@@ -104,17 +106,20 @@ class FrictionDetector(contactListener):
                 tile.road_visited = True
                 self.env.reward += 1000.0/len(self.env.track)
                 self.env.tile_visited_count += 1
+
         else:
             obj.tiles.remove(tile)
-            print(tile.road_friction, "DEL", len(obj.tiles)) # -- should delete to zero when on grass (this works)
+            if len(obj.tiles) == 0:
+                self.env.friction_out = True
+            # print(tile.road_friction, "DEL", len(obj.tiles)) # -- should delete to zero when on grass (this works)
 
-class CarRacing(gym.Env, EzPickle):
+class CarRacingSafe(gym.Env, EzPickle):
     metadata = {
         'render.modes': ['human', 'rgb_array', 'state_pixels'],
         'video.frames_per_second' : FPS
     }
 
-    def __init__(self, verbose=1):
+    def __init__(self, verbose=1, reset_when_out=False, reward_when_out=0, create_border_wall=False):
         EzPickle.__init__(self)
         self.seed()
         self.contactListener_keepref = FrictionDetector(self)
@@ -126,7 +131,12 @@ class CarRacing(gym.Env, EzPickle):
         self.car = None
         self.reward = 0.0
         self.prev_reward = 0.0
+        self.n_step = 0
         self.verbose = verbose
+
+        self.create_border_wall = create_border_wall
+        self.reward_when_repop = reward_when_out
+        self.friction_out = False
 
         self.action_space = spaces.Box( np.array([-1,0,0]), np.array([+1,+1,+1]), dtype=np.float32)  # steer, gas, brake
         self.observation_space = spaces.Box(low=0, high=255, shape=(STATE_H, STATE_W, 3), dtype=np.uint8)
@@ -286,20 +296,15 @@ class CarRacing(gym.Env, EzPickle):
                 self.road_poly.append(( [b1_l, b1_r, b2_r, b2_l], (1,1,1) if i%2==0 else (1,0,0) ))
 
             # Test creating walls
-            b1_l, b1_r, b2_r, b2_l = compute_border(x1, x2, y1, y2, beta1, beta2, side=1)
-            self.world.CreateStaticBody(shapes=polygonShape(vertices=[b1_l, b1_r, b2_r, b2_l]), )
 
-            b1_l, b1_r, b2_r, b2_l = compute_border(x1, x2, y1, y2, beta1, beta2, side=-1)
-            self.world.CreateStaticBody(shapes=polygonShape(vertices=[b1_l, b1_r, b2_r, b2_l]), )
+            if self.create_border_wall:
+                b1_l, b1_r, b2_r, b2_l = compute_border(x1, x2, y1, y2, beta1, beta2, side=1)
+                self.world.CreateStaticBody(shapes=polygonShape(vertices=[b1_l, b1_r, b2_r, b2_l]), )
+
+                b1_l, b1_r, b2_r, b2_l = compute_border(x1, x2, y1, y2, beta1, beta2, side=-1)
+                self.world.CreateStaticBody(shapes=polygonShape(vertices=[b1_l, b1_r, b2_r, b2_l]), )
 
         self.track = track
-
-
-
-        wall_size = 0.01
-
-
-
         return True
 
     def reset(self):
@@ -308,7 +313,9 @@ class CarRacing(gym.Env, EzPickle):
         self.prev_reward = 0.0
         self.tile_visited_count = 0
         self.t = 0.0
+        self.n_step = 0
         self.road_poly = []
+        self.friction_out = False
 
         while True:
             success = self._create_track()
@@ -319,6 +326,23 @@ class CarRacing(gym.Env, EzPickle):
 
         return self.step(None)[0]
 
+
+    def reset_car(self):
+
+        last_tile_visited = max(self.tile_visited_count-1,0)
+        last_tile_visited = min(last_tile_visited, len(self.track)-1)
+
+        angle, x, y = self.track[last_tile_visited][1:4]
+
+        self.car.hull.angularVelocity = 0.0
+        self.car.hull.linearVelocity = b2Vec2(0,0)
+        self.car.hull.angle = angle
+        self.car.hull.position = x, y
+
+        self.friction_out = False
+
+
+
     def step(self, action):
         if action is not None:
             self.car.steer(-action[0])
@@ -328,6 +352,8 @@ class CarRacing(gym.Env, EzPickle):
         self.car.step(1.0/FPS)
         self.world.Step(1.0/FPS, 6*30, 2*30)
         self.t += 1.0/FPS
+
+        self.n_step += 1
 
         self.state = self.render("state_pixels")
 
@@ -346,6 +372,38 @@ class CarRacing(gym.Env, EzPickle):
             if abs(x) > PLAYFIELD or abs(y) > PLAYFIELD:
                 done = True
                 step_reward = -100
+
+
+            on_track = False
+            MARGIN_X = 2
+            MARGIN_Y = 2
+
+            for i in range(len(self.track)-1) :
+                alpha2, beta2, x1, y1 = self.track[i + 1]
+                alpha1, beta1, x2, y2 = self.track[i]
+
+                x1, y1 = (x1 - TRACK_WIDTH * math.cos(beta1), y1 - TRACK_WIDTH * math.sin(beta1))
+                x2, y2 = (x2 + TRACK_WIDTH * math.cos(beta2), y2 + TRACK_WIDTH * math.sin(beta2))
+
+                x1, x2 = min(x1,x2) - MARGIN_X, max(x1,x2) + MARGIN_X
+                y1, y2 = min(y1,y2) - MARGIN_Y, max(y1,y2) + MARGIN_Y
+
+                if x > x1 and x < x2 and y > y1 and y < y2:
+                    on_track = True
+
+            if on_track:
+                print("IN")
+            else:
+                print("OUT")
+
+            if not on_track and self.friction_out:
+                self.reset_car()
+                step_reward += self.reward_when_repop
+
+
+
+        if self.n_step > 1500:
+            done = True
 
         return self.state, step_reward, done, {}
 
@@ -493,7 +551,7 @@ if __name__=="__main__":
         if k==key.RIGHT and a[0]==+1.0: a[0] = 0
         if k==key.UP:    a[1] = 0
         if k==key.DOWN:  a[2] = 0
-    env = CarRacing()
+    env = CarRacingSafe()
     env.render()
     env.viewer.window.on_key_press = key_press
     env.viewer.window.on_key_release = key_release

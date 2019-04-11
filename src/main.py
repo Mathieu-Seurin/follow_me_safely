@@ -13,6 +13,9 @@ import torch
 import os
 
 from xvfbwrapper import Xvfb
+
+from env_tools.car_racing import CarRacingSafe
+
 display = Xvfb(width=100, height=100, colordepth=16)
 
 parser = argparse.ArgumentParser('Log Parser arguments!')
@@ -38,12 +41,11 @@ full_config, expe_path = load_config(env_config_file=args.env_config,
 writer = tensorboardX.SummaryWriter(expe_path)
 log_every = 100
 
-#
-# if "car" in full_config["env_name"].lower():
-#     game =
-# else:
 
-game = gym.make(full_config["env_name"])
+if "safe" in full_config["env_name"].lower():
+    game = CarRacingSafe()
+else:
+    game = gym.make(full_config["env_name"])
 
 # Apply wrapper necessary to the env
 wrapper_translate = dict([("frameskip", FrameStackWrapper), ("action", CarActionWrapper)])
