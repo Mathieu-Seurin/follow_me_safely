@@ -328,6 +328,24 @@ class CarRacingSafe(gym.Env, EzPickle):
                 print("retry to generate track (normal if there are not many of this messages)")
         self.car = Car(self.world, *self.track[0][1:4])
 
+        MARGIN_X = 2
+        MARGIN_Y = 2
+
+        self.precomputed_positions = []
+        for i in range(len(self.track)-1):
+
+            alpha2, beta2, x1, y1 = self.track[i + 1]
+            alpha1, beta1, x2, y2 = self.track[i]
+
+            x1, y1 = (x1 - TRACK_WIDTH * math.cos(beta1), y1 - TRACK_WIDTH * math.sin(beta1))
+            x2, y2 = (x2 + TRACK_WIDTH * math.cos(beta2), y2 + TRACK_WIDTH * math.sin(beta2))
+
+            x1, x2 = min(x1, x2) - MARGIN_X, max(x1, x2) + MARGIN_X
+            y1, y2 = min(y1, y2) - MARGIN_Y, max(y1, y2) + MARGIN_Y
+
+            self.precomputed_positions.append((x1,x2,y1,y2))
+
+
         return self.step(None)[0]
 
 
@@ -383,21 +401,9 @@ class CarRacingSafe(gym.Env, EzPickle):
                 done = True
                 step_reward = -100
 
-
+            # Check if car is within boundary
             on_track = False
-            MARGIN_X = 2
-            MARGIN_Y = 2
-
-            for i in range(len(self.track)-1) :
-                alpha2, beta2, x1, y1 = self.track[i + 1]
-                alpha1, beta1, x2, y2 = self.track[i]
-
-                x1, y1 = (x1 - TRACK_WIDTH * math.cos(beta1), y1 - TRACK_WIDTH * math.sin(beta1))
-                x2, y2 = (x2 + TRACK_WIDTH * math.cos(beta2), y2 + TRACK_WIDTH * math.sin(beta2))
-
-                x1, x2 = min(x1,x2) - MARGIN_X, max(x1,x2) + MARGIN_X
-                y1, y2 = min(y1,y2) - MARGIN_Y, max(y1,y2) + MARGIN_Y
-
+            for x1,x2,y1,y2 in self.precomputed_positions :
                 if x > x1 and x < x2 and y > y1 and y < y2:
                     on_track = True
 
