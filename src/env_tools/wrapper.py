@@ -5,6 +5,8 @@ from collections import OrderedDict
 from itertools import product
 from skimage import color
 
+from env_tools.car_racing import CarRacingSafe
+
 class PreprocessWrapperPytorch(gym.core.ObservationWrapper):
     def __init__(self, env):
         super().__init__(env)
@@ -53,11 +55,23 @@ class CarActionWrapper(gym.core.ActionWrapper):
         super().__init__(env)
 
         self.action_map = np.array(
-            [k for k in product([-1, 0, 1], [1, 0], [0.2, 0])]
+            [(-1, 1, 0.2),
+             (-1, 1, 0),
+             (-1, 0, 0.2),
+             (-1, 0, 0),
+             (0, 1, 0.2),
+             (0, 1, 0),
+             (0, 0, 0.2),
+             (0, 0, 0),
+             (1, 1, 0.2),
+             (1, 1, 0),
+             (1, 0, 0.2),
+             (1, 0, 0)]
         )
-        self.action_space = gym.spaces.Discrete(len(self.action_map))
-        self.dont_move_action = np.where((self.action_map == 0).sum(axis=1) == 3)[0][0] # Compute where all angles == 0
 
+        self.action_space = gym.spaces.Discrete(len(self.action_map))
+        self.dont_move_action = 7
+        self.brake_action = 6
 
     def action(self, action):
         converted_action = self.action_map[action]
@@ -72,7 +86,14 @@ class FrameStackWrapper(gym.Wrapper):
         super(FrameStackWrapper, self).__init__(env)
 
         if isinstance(env.observation_space, gym.spaces.Dict):
-            raise NotImplementedError("Todo later")
+            base_shape = env.observation_space.spaces['state'].shape[:2]  # Deleting the channel because it's converted to grey
+            extended_shape = (n_frameskip, *base_shape)
+
+            new_obs_space = dict()
+            new_obs_space['state'] = gym.spaces.Box(low=-1, high=1, shape=extended_shape)
+            new_obs_space['gave_feedback'] = gym.spaces.MultiDiscrete([2] * n_frameskip)
+            self.observation_space = gym.spaces.Dict(new_obs_space)
+
         else:
             base_shape = env.observation_space.shape[:2] # Deleting the channel because it's converted to grey
             extended_shape = (n_frameskip, *base_shape)
@@ -85,6 +106,9 @@ class FrameStackWrapper(gym.Wrapper):
 
         self.early_reset = early_reset
         self.min_reward_before_reset = 12
+
+        # todo : Ugly
+        self.brake_action = env.brake_action
 
     def convert(self, frame):
         """
@@ -106,43 +130,49 @@ class FrameStackWrapper(gym.Wrapper):
         Concatenate obs on the first dimension
         """
         if isinstance(obs_list[0], np.ndarray):
-            return np.concatenate(obs_list)
+            return np.concatenate([self.convert(obs) for obs in obs_list])
         elif isinstance(obs_list[0], dict):
-            raise NotImplementedError("Need to check feedback, if stack on dim=0 or 1")
             stacked_obs = dict()
-            for key in obs_list.keys():
-                stacked_obs[key] = np.concatenate([obs[key] for obs in obs_list])
+            stacked_obs['state'] = np.concatenate([self.convert(obs['state']) for obs in obs_list])
+            stacked_obs['gave_feedback'] = np.array([obs['gave_feedback'] for obs in obs_list])
+            assert stacked_obs['gave_feedback'].sum() <= 1, "Received 2 feedback in same step, bad."
 
             return stacked_obs
         else:
             raise NotImplementedError("Problem in obs list")
 
-    def check_early_reset(self, reward):
-        pass
+    def stack_inf(self, info_dict):
+
+        new_info = dict()
+        new_info['gave_feedback'] = max([info['gave_feedback'] for info in info_dict])
+        new_info['percentage_road_visited'] = max([info['percentage_road_visited'] for info in info_dict])
 
     def step(self, action):
         sum_reward = 0
         stacked_obs = []
+        stacked_info = []
 
         for current_frame in range(self.n_frameskip):
-            obs, reward, done, _ = super().step(action)
+            obs, reward, done, info = super().step(action)
 
             sum_reward += reward
-            stacked_obs.append(self.convert(obs))
+
+            stacked_obs.append(obs)
+            stacked_info.append(info)
 
             self.render('rgb_array')
+
+            if obs['gave_feedback']:
+                action = self.brake_action
 
             if done:
                 stacked_obs.extend([self.empty_image] * (self.n_frameskip - len(stacked_obs)))
                 break
 
-        if self.early_reset:
-            self.check_early_reset(sum_reward)
-
         array_obs = self.stack(stacked_obs)
         assert self.observation_space.contains(array_obs), "Problem, observation don't match observation space."
 
-        return array_obs, sum_reward, done, None
+        return array_obs, sum_reward, done, self.stack_inf(stacked_info)
 
     def reset(self):
         """
@@ -165,6 +195,8 @@ class FrameStackWrapper(gym.Wrapper):
         self.reward_neg_counter = 0
 
         self.render('rgb_array')
+
+        assert self.observation_space.contains(obs), "Problem, observation don't match observation space."
         return obs
 
 
@@ -176,7 +208,7 @@ if __name__ == "__main__" :
     import time
 
     #with Xvfb(width=100, height=100, colordepth=16) as disp:
-    game = gym.make("CarRacing-v0")
+    game = CarRacingSafe()
 
     game = CarActionWrapper(game)
     game = FrameStackWrapper(game)
@@ -192,18 +224,18 @@ if __name__ == "__main__" :
 
     while not done:
         a = game.action_space.sample()
-        obs, rew, done, _ = game.step(a)
+        obs, rew, done, info = game.step(a)
 
         print(rew)
 
-        assert obs.shape == (3,96,96)
+        assert obs['state'].shape == (3,96,96)
 
-        # plt.imshow(game._unconvert(obs[0, :, :]))
-        # plt.savefig('test{:04d}1'.format(step))
-        # plt.imshow(game._unconvert(obs[1, :, :]))
-        # plt.savefig('test{:04d}2'.format(step))
-        # plt.imshow(game._unconvert(obs[2, :, :]))
-        # plt.savefig('test{:04d}3'.format(step))
+        plt.imshow(game._unconvert(obs['state'][0, :, :]))
+        plt.show()
+        plt.imshow(game._unconvert(obs['state'][1, :, :]))
+        plt.show()
+        plt.imshow(game._unconvert(obs['state'][2, :, :]))
+        plt.show()
 
         step += 1
 

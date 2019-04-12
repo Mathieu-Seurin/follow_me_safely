@@ -349,9 +349,6 @@ class CarRacingSafe(gym.Env, EzPickle):
 
     def step(self, action):
 
-        print(action)
-
-
         if action is not None:
             self.car.steer(-action[0])
             self.car.gas(action[1])
