@@ -3,6 +3,8 @@ import argparse
 import gym.wrappers
 from env_tools.wrapper import PreprocessWrapperPytorch, FrameStackWrapper, CarActionWrapper
 
+from env_tools.car_racing import CarRacingSafe
+
 from config import load_config
 from rl_agent.dqn_agent import DQNAgent
 
@@ -38,7 +40,11 @@ full_config, expe_path = load_config(env_config_file=args.env_config,
                           )
 
 
-game = gym.make(full_config["env_name"])
+if "safe" in full_config["env_name"].lower():
+    game = CarRacingSafe()
+else:
+    game = gym.make(full_config["env_name"])
+
 
 # Apply wrapper necessary to the env
 wrapper_translate = dict([("frameskip", FrameStackWrapper), ("action", CarActionWrapper)])

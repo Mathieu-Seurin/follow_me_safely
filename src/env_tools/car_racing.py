@@ -357,6 +357,8 @@ class CarRacingSafe(gym.Env, EzPickle):
 
         self.state = self.render("state_pixels")
 
+        info = dict()
+
         step_reward = 0
         done = False
         if action is not None: # First step without action, called from reset()
@@ -391,21 +393,16 @@ class CarRacingSafe(gym.Env, EzPickle):
                 if x > x1 and x < x2 and y > y1 and y < y2:
                     on_track = True
 
-            if on_track:
-                print("IN")
-            else:
-                print("OUT")
 
             if not on_track and self.friction_out:
                 self.reset_car()
                 step_reward += self.reward_when_repop
-
-
+                info['gave_feedback'] = True
 
         if self.n_step > 1500:
             done = True
 
-        return self.state, step_reward, done, {}
+        return self.state, step_reward, done, info
 
     def render(self, mode='human'):
         assert mode in ['human', 'state_pixels', 'rgb_array']

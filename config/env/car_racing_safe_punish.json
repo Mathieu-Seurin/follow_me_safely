@@ -1,8 +1,8 @@
 {
-  "name": "CarRacing-safe-v0",
+  "name": "CarRacing-safe-punish-v0",
   "wrappers" : ["action", "frameskip"],
 
-  "reward_when_out" : 0,
+  "reward_when_out" : -1,
 
   "stop" : {
     "episode_reward_mean" : 700,

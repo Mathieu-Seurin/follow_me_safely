@@ -67,6 +67,13 @@ early_stopping = False
 reward_undiscount_list = []
 reward_discount_list = []
 
+# When the env reset, it can give the algorithm a negative reward
+# Meaning the score will look worst compared to other environment where no negative reward is given
+# So reward_discount_list contains the cumulated reward NOT INCLUDING feedback
+# and reward_undiscount_list_feedback_incorporated INCLUDE the feedback (so the reward will be worst)
+reward_undiscount_list_feedback_incorporated = []
+
+
 best_undiscount_reward = -float("inf")
 
 model_type = full_config["agent_type"]
@@ -88,6 +95,7 @@ with display as xvfb:
         iter_this_ep = 0
         reward_total_discounted = 0
         reward_total_not_discounted = 0
+        reward_total_not_discounted_feedback_included = 0
 
         while not done:
 
@@ -109,9 +117,10 @@ with display as xvfb:
             total_iter += 1
             iter_this_ep = iter_this_ep + 1
 
+            reward_total_not_discounted_feedback_included += reward
+
             reward_total_discounted += reward * (discount_factor ** iter_this_ep)
             reward_total_not_discounted += reward
-
 
         # DONE GO HERE :
         model.callback(epoch=num_episode)
