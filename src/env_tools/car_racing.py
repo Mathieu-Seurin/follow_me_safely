@@ -139,7 +139,11 @@ class CarRacingSafe(gym.Env, EzPickle):
         self.friction_out = False
 
         self.action_space = spaces.Box( np.array([-1,0,0]), np.array([+1,+1,+1]), dtype=np.float32)  # steer, gas, brake
-        self.observation_space = spaces.Box(low=0, high=255, shape=(STATE_H, STATE_W, 3), dtype=np.uint8)
+
+        obs_space_dict = dict()
+        obs_space_dict['state'] = spaces.Box(low=0, high=255, shape=(STATE_H, STATE_W, 3), dtype=np.uint8)
+        obs_space_dict['gave_feedback'] = spaces.Discrete(2)
+        self.observation_space = spaces.Dict(obs_space_dict)
 
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
@@ -344,6 +348,10 @@ class CarRacingSafe(gym.Env, EzPickle):
 
 
     def step(self, action):
+
+        print(action)
+
+
         if action is not None:
             self.car.steer(-action[0])
             self.car.gas(action[1])
