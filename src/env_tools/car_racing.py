@@ -355,9 +355,12 @@ class CarRacingSafe(gym.Env, EzPickle):
 
         self.n_step += 1
 
-        self.state = self.render("state_pixels")
+        state = dict()
+        state['gave_feedback'] = 0
+        state['state'] = self.render("state_pixels")
 
         info = dict()
+        info['gave_feedback'] = 0
 
         step_reward = 0
         done = False
@@ -397,12 +400,16 @@ class CarRacingSafe(gym.Env, EzPickle):
             if not on_track and self.friction_out:
                 self.reset_car()
                 step_reward += self.reward_when_repop
-                info['gave_feedback'] = True
+                info['gave_feedback'] = 1
+                state['gave_feedback'] = 1
 
         if self.n_step > 1500:
             done = True
 
-        return self.state, step_reward, done, info
+        info['percentage_road_visited'] = self.tile_visited_count / len(self.track)
+        # It's quite hard to avoid tile, so the count is enough
+
+        return state, step_reward, done, info
 
     def render(self, mode='human'):
         assert mode in ['human', 'state_pixels', 'rgb_array']
