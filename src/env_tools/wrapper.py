@@ -146,6 +146,7 @@ class FrameStackWrapper(gym.Wrapper):
         new_info = dict()
         new_info['gave_feedback'] = max([info['gave_feedback'] for info in info_dict])
         new_info['percentage_road_visited'] = max([info['percentage_road_visited'] for info in info_dict])
+        return new_info
 
     def step(self, action):
         sum_reward = 0

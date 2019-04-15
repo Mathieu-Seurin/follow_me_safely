@@ -4,8 +4,10 @@
 
   "reward_when_out" : -10,
 
+  "reset_when_out" : true,
+
   "stop" : {
-    "episode_reward_mean" : 700,
+    "episode_reward_mean" : 800,
     "episodes_total" : 1000
   }
 }

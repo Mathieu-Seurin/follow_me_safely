@@ -38,7 +38,7 @@ class ConvModel(nn.Module):
         if isinstance(state_dim, gym.spaces.Box):
             self.input_shape = state_dim.shape
         else:
-            self.input_shape = state_dim.spaces["image"].shape
+            self.input_shape = state_dim.spaces["state"].shape
 
         self.additionnal_input_size = 0
 
@@ -75,7 +75,7 @@ class ConvModel(nn.Module):
 
     def forward(self, x):
 
-        #x = x['env_state']
+        x = x['state']
         x = self.conv_layers(x)
         x = x.view(x.size(0), -1)
         x = F.relu(self.hidden_layer(x))

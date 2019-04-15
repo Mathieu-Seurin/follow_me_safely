@@ -119,7 +119,7 @@ class CarRacingSafe(gym.Env, EzPickle):
         'video.frames_per_second' : FPS
     }
 
-    def __init__(self, verbose=1, reset_when_out=False, reward_when_out=0, create_border_wall=False):
+    def __init__(self, reset_when_out, reward_when_out, max_steps, create_border_wall=False, verbose=1):
         EzPickle.__init__(self)
         self.seed()
         self.contactListener_keepref = FrictionDetector(self)
@@ -134,9 +134,15 @@ class CarRacingSafe(gym.Env, EzPickle):
         self.n_step = 0
         self.verbose = verbose
 
-        self.create_border_wall = create_border_wall
         self.reward_when_repop = reward_when_out
+        self.reset_when_out = reset_when_out
+        self.max_steps = max_steps
+
+        self.create_border_wall = create_border_wall
+
+        # Init the "out of track" detector
         self.friction_out = False
+
 
         self.action_space = spaces.Box( np.array([-1,0,0]), np.array([+1,+1,+1]), dtype=np.float32)  # steer, gas, brake
 
@@ -409,12 +415,15 @@ class CarRacingSafe(gym.Env, EzPickle):
 
 
             if not on_track and self.friction_out:
-                self.reset_car()
+
+                if self.reset_when_out:
+                    self.reset_car()
+
                 step_reward += self.reward_when_repop
                 info['gave_feedback'] = 1
                 state['gave_feedback'] = 1
 
-        if self.n_step > 1500:
+        if self.n_step > self.max_steps:
             done = True
 
         info['percentage_road_visited'] = self.tile_visited_count / len(self.track)

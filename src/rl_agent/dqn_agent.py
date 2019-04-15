@@ -101,6 +101,10 @@ class DQNAgent(object):
             self.target_net.load_state_dict(self.policy_net.state_dict())
             self.num_update += 1
 
+    def expert_loss(self):
+        # todo : this
+        pass
+
     def optimize(self):
         if len(self.memory) < self.batch_size:
             return

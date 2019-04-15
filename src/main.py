@@ -43,7 +43,13 @@ log_every = 100
 
 
 if "safe" in full_config["env_name"].lower():
-    game = CarRacingSafe()
+    reset_when_out = full_config["reset_when_out"]
+    reward_when_out = full_config["reward_when_out"]
+    max_steps = full_config["max_steps"]
+
+    game = CarRacingSafe(reset_when_out=reset_when_out,
+                         reward_when_out=reward_when_out,
+                         max_steps=max_steps)
 else:
     game = gym.make(full_config["env_name"])
 
@@ -67,13 +73,6 @@ early_stopping = False
 reward_undiscount_list = []
 reward_discount_list = []
 
-# When the env reset, it can give the algorithm a negative reward
-# Meaning the score will look worst compared to other environment where no negative reward is given
-# So reward_discount_list contains the cumulated reward NOT INCLUDING feedback
-# and reward_undiscount_list_feedback_incorporated INCLUDE the feedback (so the reward will be worst)
-reward_undiscount_list_feedback_incorporated = []
-
-
 best_undiscount_reward = -float("inf")
 
 model_type = full_config["agent_type"]
@@ -89,13 +88,16 @@ else:
 with display as xvfb:
 
     while num_episode < episodes and not early_stopping :
-        state = torch.FloatTensor(game.reset()).unsqueeze(0)
+
+        state = game.reset()
+        state['state'] = torch.FloatTensor(state['state']).unsqueeze(0)
         #game.render('human')
         done = False
         iter_this_ep = 0
         reward_total_discounted = 0
         reward_total_not_discounted = 0
-        reward_total_not_discounted_feedback_included = 0
+        percentage_tile_seen = 0
+        n_feedback_this_ep = 0
 
         while not done:
 
@@ -103,13 +105,14 @@ with display as xvfb:
             next_state, reward, done, info = game.step(action=action.item())
 
             reward = torch.FloatTensor([reward])
-            next_state = torch.FloatTensor(next_state).unsqueeze(0)
+            next_state['state'] = torch.FloatTensor(next_state['state']).unsqueeze(0)
 
             #game.render()
             if done:
                 next_state = None
 
-            model.push(state.to('cpu'), action, next_state, reward)
+            state['state'] = state['state'].to('cpu')
+            model.push(state, action, next_state, reward)
             model.optimize()
 
             state = next_state
@@ -117,7 +120,10 @@ with display as xvfb:
             total_iter += 1
             iter_this_ep = iter_this_ep + 1
 
-            reward_total_not_discounted_feedback_included += reward
+            percentage_tile_seen = max(info['percentage_road_visited'], percentage_tile_seen)
+            n_feedback_this_ep += info['gave_feedback']
+
+            assert next_state['gave_feedback'] == info['gave_feedback'], "Problem, info should contain the same info as state"
 
             reward_total_discounted += reward * (discount_factor ** iter_this_ep)
             reward_total_not_discounted += reward
@@ -143,6 +149,8 @@ with display as xvfb:
                 "Reward at the end of ep #{}, n_timesteps {}, discounted rew : {} undiscounted : {}, current_eps {}".format(
                     num_episode, total_iter, reward_discount_mean, reward_undiscount_mean, model.current_eps))
 
+            writer.add_scalar("data/percentage_tile_seen", percentage_tile_seen, total_iter)
+            writer.add_scalar("data/number_of feedback", n_feedback_this_ep, total_iter)
             writer.add_scalar("data/sum_reward_discounted", reward_discount_mean, total_iter)
             writer.add_scalar("data/sum_reward_not_discounted", reward_undiscount_mean, total_iter)
             writer.add_scalar("data/iter_per_ep", iter_this_ep, total_iter)
