@@ -75,7 +75,7 @@ class ConvModel(nn.Module):
 
     def forward(self, x):
 
-        x = x['state']
+        #x = x['state']
         x = self.conv_layers(x)
         x = x.view(x.size(0), -1)
         x = F.relu(self.hidden_layer(x))

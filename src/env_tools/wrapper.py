@@ -135,7 +135,7 @@ class FrameStackWrapper(gym.Wrapper):
             stacked_obs = dict()
             stacked_obs['state'] = np.concatenate([self.convert(obs['state']) for obs in obs_list])
             stacked_obs['gave_feedback'] = np.array([obs['gave_feedback'] for obs in obs_list])
-            assert stacked_obs['gave_feedback'].sum() <= 1, "Received 2 feedback in same step, bad."
+            #assert stacked_obs['gave_feedback'].sum() <= 1, "Received 2 feedback in same step, bad."
 
             return stacked_obs
         else:
@@ -163,7 +163,7 @@ class FrameStackWrapper(gym.Wrapper):
 
             self.render('rgb_array')
 
-            if obs['gave_feedback']:
+            if obs['gave_feedback'] and self.unwrapped.reset_when_out :
                 action = self.brake_action
 
             if done:

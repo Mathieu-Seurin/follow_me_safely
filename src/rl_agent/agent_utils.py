@@ -7,8 +7,12 @@ import torch.nn as nn
 import logging
 
 
+# Transition = namedtuple('Transition',
+#                         ('state', 'action', 'next_state', 'reward'))
+
 Transition = namedtuple('Transition',
-                        ('state', 'action', 'next_state', 'reward'))
+                        ('state', 'action', 'next_state', 'reward', 'gave_feedback'))
+
 
 class ReplayMemory(object):
 

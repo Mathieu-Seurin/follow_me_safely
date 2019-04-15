@@ -3,6 +3,8 @@ import argparse
 import gym.wrappers
 from env_tools.wrapper import PreprocessWrapperPytorch, FrameStackWrapper, CarActionWrapper
 
+import matplotlib.pyplot as plt
+
 from config import load_config
 from rl_agent.dqn_agent import DQNAgent
 
@@ -12,11 +14,10 @@ import torch
 
 import os
 
-from xvfbwrapper import Xvfb
+
 
 from env_tools.car_racing import CarRacingSafe
 
-display = Xvfb(width=100, height=100, colordepth=16)
 
 parser = argparse.ArgumentParser('Log Parser arguments!')
 
@@ -26,9 +27,20 @@ parser.add_argument("-model_config", type=str)
 parser.add_argument("-model_ext",    type=str)
 parser.add_argument("-exp_dir",      type=str, default="out", help="Directory all results")
 parser.add_argument("-seed",         type=int, default=42, help="Random seed used")
+parser.add_argument("-local_test",   type=bool, default=False, help="Random seed used")
 
 
 args = parser.parse_args()
+
+
+
+if args.local_test:
+    from xvfbwrapper import Xvfb
+    display = Xvfb(width=100, height=100, colordepth=16)
+else :
+    display = open('nothing.txt', 'w')
+
+
 
 full_config, expe_path = load_config(env_config_file=args.env_config,
                           model_config_file=args.model_config,
@@ -101,7 +113,7 @@ with display as xvfb:
 
         while not done:
 
-            action = model.select_action(state)
+            action = model.select_action(state['state'])
             next_state, reward, done, info = game.step(action=action.item())
 
             reward = torch.FloatTensor([reward])
@@ -111,9 +123,11 @@ with display as xvfb:
             if done:
                 next_state = None
 
-            state['state'] = state['state'].to('cpu')
-            model.push(state, action, next_state, reward)
+            model.push(state['state'].to('cpu'), action, next_state['state'], reward, next_state['gave_feedback'])
             model.optimize()
+
+            # plt.imshow(game._unconvert(state['state'][0][0].numpy()))
+            # plt.show()
 
             state = next_state
 
@@ -123,10 +137,12 @@ with display as xvfb:
             percentage_tile_seen = max(info['percentage_road_visited'], percentage_tile_seen)
             n_feedback_this_ep += info['gave_feedback']
 
-            assert next_state['gave_feedback'] == info['gave_feedback'], "Problem, info should contain the same info as state"
+            assert max(next_state['gave_feedback']) == info['gave_feedback'], "Problem, info should contain the same info as state"
 
             reward_total_discounted += reward * (discount_factor ** iter_this_ep)
             reward_total_not_discounted += reward
+
+            print("step",total_iter)
 
         # DONE GO HERE :
         model.callback(epoch=num_episode)

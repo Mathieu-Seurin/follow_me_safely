@@ -1,10 +1,12 @@
 {
-  "name": "CarRacing-safe-v0",
+  "name": "CarRacing-safe-v0-reset-no_reward",
   "wrappers" : ["action", "frameskip"],
 
   "reward_when_out" : 0,
 
   "reset_when_out" : true,
+
+  "max_steps" : 3000,
 
   "stop" : {
     "episode_reward_mean" : 800,
