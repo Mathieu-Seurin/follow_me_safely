@@ -29,6 +29,7 @@ class DQNAgent(object):
             self.classification_margin = config["classification_margin"]
             self.feedback_loss = feedback_loss
             self.regression_loss = F.smooth_l1_loss
+            self.classification_loss_weight = config["classification_loss_weight"]
 
         else:
             self.feedback_loss = lambda *args,**kwargs: 0
@@ -159,7 +160,7 @@ class DQNAgent(object):
         q_loss = F.smooth_l1_loss(state_action_values, expected_state_action_values)
 
         # Compute the 2 losses
-        loss = q_loss + feedback_loss
+        loss = q_loss + self.classification_loss_weight * feedback_loss
 
         # Optimize the model
         self.optimizer.zero_grad()
