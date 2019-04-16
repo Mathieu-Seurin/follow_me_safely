@@ -1,0 +1,18 @@
+{
+  "name": "CarRacing-v0-safe-no_reset-no_punish_frameskip4",
+  "wrappers" : ["action", "frameskip"],
+
+  "frameskip" : 4,
+
+  "reset_when_out" : false,
+
+  "reward_when_out" : 0,
+
+  "max_steps" : 1000,
+
+  "stop" : {
+    "episode_reward_mean" : 700,
+    "episodes_total" : 1000
+  }
+}
+
