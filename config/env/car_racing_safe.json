@@ -6,7 +6,7 @@
 
   "reset_when_out" : true,
 
-  "max_steps" : 3000,
+  "max_steps" : 1000,
 
   "stop" : {
     "episode_reward_mean" : 800,

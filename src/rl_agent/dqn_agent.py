@@ -1,4 +1,4 @@
-from rl_agent.agent_utils import Transition, ReplayMemory, check_params_changed
+from rl_agent.agent_utils import Transition, ReplayMemory, check_params_changed, feedback_loss
 import torch
 import torch.nn.functional as F
 
@@ -24,6 +24,14 @@ class DQNAgent(object):
         self.update_every_n_ep = config["update_every_n_ep"]
 
         self.num_update = 0
+
+        if config.get("use_margin_loss", False):
+            self.classification_margin = config["classification_margin"]
+            self.feedback_loss = feedback_loss
+            self.regression_loss = F.smooth_l1_loss
+
+        else:
+            self.feedback_loss = lambda *args,**kwargs: 0
 
         Model = FullyConnectedModel if config["model_type"] == "fc" else ConvModel
 
@@ -101,10 +109,6 @@ class DQNAgent(object):
             self.target_net.load_state_dict(self.policy_net.state_dict())
             self.num_update += 1
 
-    def expert_loss(self):
-        # todo : this
-        pass
-
     def optimize(self):
         if len(self.memory) < self.batch_size:
             return
@@ -124,11 +128,20 @@ class DQNAgent(object):
         state_batch = torch.cat(batch.state).to(TORCH_DEVICE)
         action_batch = torch.cat(batch.action).to(TORCH_DEVICE)
         reward_batch = torch.cat(batch.reward).to(TORCH_DEVICE)
+        feedback_batch = torch.cat(batch.gave_feedback).to(TORCH_DEVICE)
 
         # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
         # columns of actions taken. These are the actions which would've been taken
         # for each batch state according to policy_net
-        state_action_values = self.policy_net(state_batch).gather(1, action_batch)
+        state_action_values = self.policy_net(state_batch)
+
+        feedback_loss = self.feedback_loss(qs=state_action_values,
+                                           action=action_batch,
+                                           feedback=feedback_batch,
+                                           margin=self.classification_margin,
+                                           regression_loss=self.regression_loss)
+
+        state_action_values = state_action_values.gather(1, action_batch)
 
         # Compute V(s_{t+1}) for all next states.
         # Expected values of actions for non_final_next_states are computed based
@@ -143,7 +156,10 @@ class DQNAgent(object):
         expected_state_action_values = expected_state_action_values.unsqueeze(1)
         # Compute Huber loss
         assert state_action_values.size() == expected_state_action_values.size()
-        loss = F.smooth_l1_loss(state_action_values, expected_state_action_values)
+        q_loss = F.smooth_l1_loss(state_action_values, expected_state_action_values)
+
+        # Compute the 2 losses
+        loss = q_loss + feedback_loss
 
         # Optimize the model
         self.optimizer.zero_grad()

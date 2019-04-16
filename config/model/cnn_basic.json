@@ -39,6 +39,10 @@
 
     },
 
-    "update_every_n_ep" : 4
+    "update_every_n_ep" : 4,
+
+    "use_margin_loss" : false,
+    "classification_margin" : 0
+
   }
 }

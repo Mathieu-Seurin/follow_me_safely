@@ -79,7 +79,7 @@ class CarActionWrapper(gym.core.ActionWrapper):
 
 class FrameStackWrapper(gym.Wrapper):
 
-    def __init__(self, env, n_frameskip=3, early_reset=True):
+    def __init__(self, env, n_frameskip, early_reset=True):
         self.n_frameskip = n_frameskip
 
         assert self.n_frameskip > 1, "Frameskip is useless"
@@ -91,7 +91,7 @@ class FrameStackWrapper(gym.Wrapper):
 
             new_obs_space = dict()
             new_obs_space['state'] = gym.spaces.Box(low=-1, high=1, shape=extended_shape)
-            new_obs_space['gave_feedback'] = gym.spaces.MultiDiscrete([2] * n_frameskip)
+            new_obs_space['gave_feedback'] = gym.spaces.Discrete(2)
             self.observation_space = gym.spaces.Dict(new_obs_space)
 
         else:
@@ -99,7 +99,7 @@ class FrameStackWrapper(gym.Wrapper):
             extended_shape = (n_frameskip, *base_shape)
             self.observation_space = gym.spaces.Box(low=-1, high=1, shape=extended_shape)
 
-        self.empty_image = np.zeros((1, *base_shape))
+        self.empty_image = np.zeros(env.observation_space.spaces['state'].shape)
         self.empty_feedback = 0
 
         self.frames_before_zoom_end = 48 # Number of step for the zoom to end, fuck this shit.
@@ -112,7 +112,7 @@ class FrameStackWrapper(gym.Wrapper):
 
     def convert(self, frame):
         """
-        Convert to RGB, normalize and add dummy channel dimension so its shape is (1,96,96)
+        Convert to greyscale, normalize and add dummy channel dimension so its shape is (1,96,96)
         """
         frame = 2 * color.rgb2gray(frame) - 1.0
         frame = np.expand_dims(frame, axis=0)
@@ -134,7 +134,8 @@ class FrameStackWrapper(gym.Wrapper):
         elif isinstance(obs_list[0], dict):
             stacked_obs = dict()
             stacked_obs['state'] = np.concatenate([self.convert(obs['state']) for obs in obs_list])
-            stacked_obs['gave_feedback'] = np.array([obs['gave_feedback'] for obs in obs_list])
+            # todo : stacked them and add dimension
+            stacked_obs['gave_feedback'] = np.max(np.array([obs['gave_feedback'] for obs in obs_list]))
             #assert stacked_obs['gave_feedback'].sum() <= 1, "Received 2 feedback in same step, bad."
 
             return stacked_obs
@@ -161,13 +162,13 @@ class FrameStackWrapper(gym.Wrapper):
             stacked_obs.append(obs)
             stacked_info.append(info)
 
-            self.render('rgb_array')
+            self.render('human')
 
             if obs['gave_feedback'] and self.unwrapped.reset_when_out :
                 action = self.brake_action
 
             if done:
-                stacked_obs.extend([self.empty_image] * (self.n_frameskip - len(stacked_obs)))
+                stacked_obs.extend([{'state' : self.empty_image, 'gave_feedback' : False}] * (self.n_frameskip - len(stacked_obs)))
                 break
 
         array_obs = self.stack(stacked_obs)
@@ -195,7 +196,7 @@ class FrameStackWrapper(gym.Wrapper):
         self.early_reset = early_reset
         self.reward_neg_counter = 0
 
-        self.render('rgb_array')
+        self.render('human')
 
         assert self.observation_space.contains(obs), "Problem, observation don't match observation space."
         return obs

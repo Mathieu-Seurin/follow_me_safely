@@ -13,7 +13,7 @@ import numpy as np
 import torch
 
 import os
-
+import time
 
 
 from env_tools.car_racing import CarRacingSafe
@@ -31,15 +31,14 @@ parser.add_argument("-local_test",   type=bool, default=False, help="Random seed
 
 
 args = parser.parse_args()
-
+DEFAULT_FRAME_SKIP = 3
 
 
 if args.local_test:
+    display = open('nothing.txt', 'w')
+else :
     from xvfbwrapper import Xvfb
     display = Xvfb(width=100, height=100, colordepth=16)
-else :
-    display = open('nothing.txt', 'w')
-
 
 
 full_config, expe_path = load_config(env_config_file=args.env_config,
@@ -62,15 +61,14 @@ if "safe" in full_config["env_name"].lower():
     game = CarRacingSafe(reset_when_out=reset_when_out,
                          reward_when_out=reward_when_out,
                          max_steps=max_steps)
+
+    n_frameskip = full_config.get("frameskip", DEFAULT_FRAME_SKIP)
+
+    game = CarActionWrapper(game)
+    game = FrameStackWrapper(game, n_frameskip=n_frameskip)
+
 else:
     game = gym.make(full_config["env_name"])
-
-# Apply wrapper necessary to the env
-wrapper_translate = dict([("frameskip", FrameStackWrapper), ("action", CarActionWrapper)])
-if full_config.get("wrappers", False):
-    for wrap_key in full_config["wrappers"]:
-        game = wrapper_translate[wrap_key](game)
-
 
 episodes = full_config["stop"]["episodes_total"]
 score_success = full_config["stop"]["episode_reward_mean"]
@@ -103,6 +101,8 @@ with display as xvfb:
 
         state = game.reset()
         state['state'] = torch.FloatTensor(state['state']).unsqueeze(0)
+        state['gave_feedback'] = torch.FloatTensor([state['gave_feedback']])
+
         #game.render('human')
         done = False
         iter_this_ep = 0
@@ -118,13 +118,15 @@ with display as xvfb:
 
             reward = torch.FloatTensor([reward])
             next_state['state'] = torch.FloatTensor(next_state['state']).unsqueeze(0)
+            next_state['gave_feedback'] = torch.FloatTensor([next_state['gave_feedback']])
 
             #game.render()
-            if done:
-                next_state = None
+            # if done:
+            #     next_state = None
 
             model.push(state['state'].to('cpu'), action, next_state['state'], reward, next_state['gave_feedback'])
-            model.optimize()
+            if not args.local_test:
+                model.optimize()
 
             # plt.imshow(game._unconvert(state['state'][0][0].numpy()))
             # plt.show()
@@ -142,7 +144,8 @@ with display as xvfb:
             reward_total_discounted += reward * (discount_factor ** iter_this_ep)
             reward_total_not_discounted += reward
 
-            print("step",total_iter)
+            # print("step",total_iter)
+            # print(time.time() - timer)
 
         # DONE GO HERE :
         model.callback(epoch=num_episode)

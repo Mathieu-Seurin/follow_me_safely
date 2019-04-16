@@ -15,9 +15,9 @@ import os
 
 import matplotlib.pyplot as plt
 
-
-from xvfbwrapper import Xvfb
-display = Xvfb(width=100, height=100, colordepth=16)
+#
+# from xvfbwrapper import Xvfb
+# display = Xvfb(width=100, height=100, colordepth=16)
 
 parser = argparse.ArgumentParser('Log Parser arguments!')
 
@@ -41,7 +41,13 @@ full_config, expe_path = load_config(env_config_file=args.env_config,
 
 
 if "safe" in full_config["env_name"].lower():
-    game = CarRacingSafe()
+    reset_when_out = full_config["reset_when_out"]
+    reward_when_out = full_config["reward_when_out"]
+    max_steps = full_config["max_steps"]
+
+    game = CarRacingSafe(reset_when_out=reset_when_out,
+                         reward_when_out=reward_when_out,
+                         max_steps=max_steps)
 else:
     game = gym.make(full_config["env_name"])
 
@@ -71,53 +77,54 @@ else:
     raise NotImplementedError("{} not available for model".format(full_config["agent_type"]))
 
 
-model.policy_net.load_state_dict(torch.load(os.path.join(expe_path, 'best_model.pth')))
+model.policy_net.load_state_dict(torch.load(os.path.join(expe_path, 'best_model.pth'), map_location='cpu'))
 print(expe_path)
 
-with display as xvfb:
 
-    while num_episode < episodes :
-        state = torch.FloatTensor(game.reset()).unsqueeze(0)
+while num_episode < episodes :
 
-        done = False
-        iter_this_ep = 0
-        reward_total_discounted = 0
-        reward_total_not_discounted = 0
+    state = game.reset()
+    state['state'] = torch.FloatTensor(state['state']).unsqueeze(0)
 
-        while not done:
+    done = False
+    iter_this_ep = 0
+    reward_total_discounted = 0
+    reward_total_not_discounted = 0
 
-            action = model.select_action_greedy(state)
-            next_state, reward, done, info = game.step(action=action.item())
+    while not done:
 
-            plt.imshow(game._unconvert(next_state[0, :, :]))
-            plt.savefig(os.path.join(expe_path, 'test_ep{:03d}_step{:04d}'.format(num_episode, iter_this_ep*3)))
-            plt.close()
-            plt.imshow(game._unconvert(next_state[1, :, :]))
-            plt.savefig(os.path.join(expe_path, 'test_ep{:03d}_step{:04d}'.format(num_episode, iter_this_ep*3+1)))
-            plt.close()
-            plt.imshow(game._unconvert(next_state[2, :, :]))
-            plt.savefig(os.path.join(expe_path, 'test_ep{:03d}_step{:04d}'.format(num_episode, iter_this_ep*3+2)))
-            plt.close()
+        action = model.select_action_greedy(state['state'])
+        next_state, reward, done, info = game.step(action=action.item())
 
-            reward = torch.FloatTensor([reward])
-            next_state = torch.FloatTensor(next_state).unsqueeze(0)
+        # plt.imshow(game._unconvert(next_state[0, :, :]))
+        # plt.savefig(os.path.join(expe_path, 'test_ep{:03d}_step{:04d}'.format(num_episode, iter_this_ep*3)))
+        # plt.close()
+        # plt.imshow(game._unconvert(next_state[1, :, :]))
+        # plt.savefig(os.path.join(expe_path, 'test_ep{:03d}_step{:04d}'.format(num_episode, iter_this_ep*3+1)))
+        # plt.close()
+        # plt.imshow(game._unconvert(next_state[2, :, :]))
+        # plt.savefig(os.path.join(expe_path, 'test_ep{:03d}_step{:04d}'.format(num_episode, iter_this_ep*3+2)))
+        # plt.close()
 
-            if done:
-                next_state = None
+        reward = torch.FloatTensor([reward])
+        next_state['state'] = torch.FloatTensor(next_state['state']).unsqueeze(0)
 
-            state = next_state
+        if done:
+            next_state = None
 
-            total_iter += 1
-            iter_this_ep = iter_this_ep + 1
+        state = next_state
 
-            reward_total_discounted += reward * (discount_factor ** iter_this_ep)
-            reward_total_not_discounted += reward
+        total_iter += 1
+        iter_this_ep = iter_this_ep + 1
 
-        print(
-            "Reward at the end of ep #{}, n_timesteps {}, discounted rew : {} undiscounted : {}, current_eps {}".format(
-                num_episode, total_iter, reward_total_discounted.item(), reward_total_not_discounted.item(), model.current_eps))
+        reward_total_discounted += reward * (discount_factor ** iter_this_ep)
+        reward_total_not_discounted += reward
+
+    print(
+        "Reward at the end of ep #{}, n_timesteps {}, discounted rew : {} undiscounted : {}, current_eps {}".format(
+            num_episode, total_iter, reward_total_discounted.item(), reward_total_not_discounted.item(), model.current_eps))
 
 
-        num_episode += 1
+    num_episode += 1
 
-    print("Experiment over")
+print("Experiment over")

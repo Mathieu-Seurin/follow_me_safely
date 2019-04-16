@@ -42,10 +42,10 @@ from pyglet import gl
 
 STATE_W = 96   # less than Atari 160x192
 STATE_H = 96
-VIDEO_W = 640
-VIDEO_H = 480
-WINDOW_W = 1920
-WINDOW_H = 1080
+VIDEO_W = 600
+VIDEO_H = 400
+WINDOW_W = 1200
+WINDOW_H = 1000
 
 SCALE       = 6.0        # Track scale
 TRACK_RAD   = 900/SCALE  # Track is heavily morphed circle with this radius
@@ -413,9 +413,7 @@ class CarRacingSafe(gym.Env, EzPickle):
                 if x > x1 and x < x2 and y > y1 and y < y2:
                     on_track = True
 
-
             if not on_track and self.friction_out:
-
                 if self.reset_when_out:
                     self.reset_car()
 
