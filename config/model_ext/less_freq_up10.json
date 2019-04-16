@@ -1,7 +1,0 @@
-{
-  "name": "update_10",
-
-  "dqn_params": {
-    "update_every_n_ep" : 10
-  }
-}

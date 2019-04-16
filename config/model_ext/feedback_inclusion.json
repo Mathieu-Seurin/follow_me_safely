@@ -1,0 +1,8 @@
+{
+  "name": "feedback_inclusion",
+
+  "dqn_params": {
+    "use_margin_loss" : true,
+    "classification_margin" : 0.1
+  }
+}
