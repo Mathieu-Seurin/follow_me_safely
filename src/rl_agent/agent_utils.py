@@ -2,7 +2,7 @@ import numpy as np
 from collections import namedtuple
 
 import torch
-import torch.nn as nn
+from rl_agent.gpu_utils import TORCH_DEVICE
 
 import logging
 
@@ -74,7 +74,7 @@ def feedback_loss(qs, action, feedback, margin, regression_loss):
     m is a margin function
 
     Can be written as :
-    Minimize    Q(s,a) - min_a [ Q(s,a) - m(ab, a) ]
+    Minimize    Q(s,ab) - min_a [ Q(s,a) - m(ab, a) ]
                                           m(ab,b) = margin if ab = a
                                                   = 0 else
     """
@@ -84,18 +84,19 @@ def feedback_loss(qs, action, feedback, margin, regression_loss):
     qs_where_bad = qs[feedback != 0]
     action_where_bad = action[feedback != 0]
 
+    # Q(s, ab) => action taken was bad (feedback from env)
+    qs_a_where_bad = qs_where_bad.gather(1, action_where_bad.view(-1,1))
+
     #  =====  Compute l(a_b, a) =====
-    action_mask = torch.arange(n_action).unsqueeze(0) != action_where_bad.unsqueeze(1)
+    action_mask = torch.arange(n_action).unsqueeze(0).to(TORCH_DEVICE) != action_where_bad
     # action_mask is the same size as qs. for every row, there is a 0 in column of action, 1 elsewhere
     # Exemple : action = [0, 1, 0] action_mask = [[0,1],[1,0],[0,1]]
 
     margin_malus = action_mask.float() * margin
 
     # Compute Q(s,a) - l(a_b, a)
-    ref_qs = qs_where_bad.detach()
+    ref_qs = qs_where_bad.detach() # You optimize with respect to this ref_qs minus the margin, so you need to detach
     min_qs_minus_margin, _ = torch.min(ref_qs - margin_malus, dim=1)
-
-    qs_a_where_bad = qs_where_bad.gather(1, action_where_bad.view(-1,1))
 
     # Actual classification loss
     loss = regression_loss(min_qs_minus_margin, qs_a_where_bad) # Bring bad action down under margin
