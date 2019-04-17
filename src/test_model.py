@@ -48,16 +48,15 @@ if "safe" in full_config["env_name"].lower():
     game = CarRacingSafe(reset_when_out=reset_when_out,
                          reward_when_out=reward_when_out,
                          max_steps=max_steps)
+
+    DEFAULT_FRAME_SKIP = 3
+    n_frameskip = full_config.get("frameskip", DEFAULT_FRAME_SKIP)
+
+    game = CarActionWrapper(game)
+    game = FrameStackWrapper(game, n_frameskip=n_frameskip)
+
 else:
     game = gym.make(full_config["env_name"])
-
-
-# Apply wrapper necessary to the env
-wrapper_translate = dict([("frameskip", FrameStackWrapper), ("action", CarActionWrapper)])
-if full_config.get("wrappers", False):
-    for wrap_key in full_config["wrappers"]:
-        game = wrapper_translate[wrap_key](game)
-
 
 episodes = 5 # Number of episodes to see what the policy is doing.
 
@@ -77,7 +76,7 @@ else:
     raise NotImplementedError("{} not available for model".format(full_config["agent_type"]))
 
 
-model.policy_net.load_state_dict(torch.load(os.path.join(expe_path, 'best_model.pth'), map_location='cpu'))
+model.policy_net.load_state_dict(torch.load(os.path.join(expe_path, 'last_model.pth'), map_location='cpu'))
 print(expe_path)
 
 
@@ -97,13 +96,16 @@ while num_episode < episodes :
         next_state, reward, done, info = game.step(action=action.item())
 
         # plt.imshow(game._unconvert(next_state[0, :, :]))
-        # plt.savefig(os.path.join(expe_path, 'test_ep{:03d}_step{:04d}'.format(num_episode, iter_this_ep*3)))
+        # plt.show()
+        # #plt.savefig(os.path.join(expe_path, 'test_ep{:03d}_step{:04d}'.format(num_episode, iter_this_ep*3)))
         # plt.close()
         # plt.imshow(game._unconvert(next_state[1, :, :]))
-        # plt.savefig(os.path.join(expe_path, 'test_ep{:03d}_step{:04d}'.format(num_episode, iter_this_ep*3+1)))
+        # plt.show()
+        # #plt.savefig(os.path.join(expe_path, 'test_ep{:03d}_step{:04d}'.format(num_episode, iter_this_ep*3+1)))
         # plt.close()
         # plt.imshow(game._unconvert(next_state[2, :, :]))
-        # plt.savefig(os.path.join(expe_path, 'test_ep{:03d}_step{:04d}'.format(num_episode, iter_this_ep*3+2)))
+        # plt.show()
+        # #plt.savefig(os.path.join(expe_path, 'test_ep{:03d}_step{:04d}'.format(num_episode, iter_this_ep*3+2)))
         # plt.close()
 
         reward = torch.FloatTensor([reward])

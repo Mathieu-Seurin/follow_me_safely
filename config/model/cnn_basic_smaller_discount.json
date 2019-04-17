@@ -1,8 +1,8 @@
 {
-  "name": "dqn_conv_agent_update_4",
+  "name": "dqn_conv_agent_update_4_smaller_discount_update15",
 
   "agent_type" : "dqn",
-  "discount_factor": 0.999,
+  "discount_factor": 0.95,
 
   "biased_sampling" : true,
 
@@ -39,7 +39,7 @@
 
     },
 
-    "update_every_n_ep" : 4,
+    "update_every_n_ep" : 15,
 
     "use_margin_loss" : false,
     "classification_margin" : 0,

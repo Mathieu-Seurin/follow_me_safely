@@ -66,6 +66,10 @@ def compute_slow_params_update(slow_params, fast_params, tau):
     return slow_params_dict
 
 
+def consistency_loss(qs, action, feedback, regression_loss):
+    pass
+
+
 def feedback_loss(qs, action, feedback, margin, regression_loss):
     """
     Compute the expert loss
@@ -80,6 +84,10 @@ def feedback_loss(qs, action, feedback, margin, regression_loss):
     """
 
     # Keep qs where a feedback from environment was given.
+
+    if feedback.sum() == 0:
+        return 0
+
     n_action = qs.size(1)
     qs_where_bad = qs[feedback != 0]
     action_where_bad = action[feedback != 0]

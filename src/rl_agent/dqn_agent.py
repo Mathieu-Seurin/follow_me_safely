@@ -28,7 +28,7 @@ class DQNAgent(object):
         if config.get("use_margin_loss", False):
             self.classification_margin = config["classification_margin"]
             self.feedback_loss = feedback_loss
-            self.regression_loss = F.smooth_l1_loss
+            self.regression_loss = F.mse_loss
             self.classification_loss_weight = config["classification_loss_weight"]
 
         else:

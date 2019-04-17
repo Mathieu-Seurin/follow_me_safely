@@ -1,9 +1,9 @@
 {
-  "name": "feedback_inclusion_margin1",
+  "name": "feedback_inclusion_margin0",
 
   "dqn_params": {
     "use_margin_loss" : true,
-    "classification_margin" : 1,
+    "classification_margin" : 0,
     "classification_loss_weight" : 1
 
   }

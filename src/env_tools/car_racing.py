@@ -13,6 +13,9 @@ from gym.utils import colorize, seeding, EzPickle
 import pyglet
 from pyglet import gl
 
+import matplotlib.pyplot as plt
+from skimage import color
+
 # Easiest continuous control task to learn from pixels, a top-down racing environment.
 # Discreet control is reasonable in this environment as well, on/off discretisation is
 # fine.
@@ -573,7 +576,7 @@ if __name__=="__main__":
         if k==key.RIGHT and a[0]==+1.0: a[0] = 0
         if k==key.UP:    a[1] = 0
         if k==key.DOWN:  a[2] = 0
-    env = CarRacingSafe()
+    env = CarRacingSafe(reset_when_out=True, reward_when_out=0, max_steps=1000)
     env.render()
     env.viewer.window.on_key_press = key_press
     env.viewer.window.on_key_release = key_release
@@ -590,11 +593,13 @@ if __name__=="__main__":
         while True:
             s, r, done, info = env.step(a)
             total_reward += r
+            plt.imshow(color.rgb2gray(s['state']))
+            plt.show()
+
             if steps % 200 == 0 or done:
                 print("\naction " + str(["{:+0.2f}".format(x) for x in a])),
                 print("step {} total_reward {:+0.2f}".format(steps, total_reward))
                 #import matplotlib.pyplot as plt
-                #plt.imshow(s)
                 #plt.savefig("test.jpeg")
             steps += 1
             isopen = env.render()
