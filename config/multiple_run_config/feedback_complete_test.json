@@ -1,0 +1,15 @@
+{
+  "common" : {
+    "env_config" : "car_racing_safe.json",
+    "model_config" : "cnn_basic.json",
+    "seed" : 42
+  },
+
+  "model_ext" :
+          [
+            "margin0_f1_c1.json",
+            "margin0_f05_c1.json",
+            "margin1_f1_c1.json"
+
+          ]
+}

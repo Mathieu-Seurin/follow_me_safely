@@ -42,7 +42,7 @@
     "update_every_n_ep" : 4,
 
     "use_consistency_loss" : false,
-    "consistency_loss_weight" : 1,
+    "consistency_loss_weight" : 0,
 
     "use_margin_loss" : false,
     "classification_margin" : 0,
