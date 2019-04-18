@@ -151,7 +151,9 @@ class DQNAgent(object):
         # This is merged based on the mask, such that we'll have either the expected
         # state value or 0 in case the state was final.
         next_state_values = torch.zeros(self.batch_size, device=TORCH_DEVICE)
-        next_state_values[non_final_mask] = self.target_net(non_final_next_states).max(1)[0].detach()
+
+        next_state_action_values = self.target_net(non_final_next_states).detach()
+        next_state_values[non_final_mask] = next_state_action_values.max(1)[0]
         # Compute the expected Q values
         expected_state_action_values = (next_state_values * self.discount_factor) + reward_batch
 
@@ -173,7 +175,7 @@ class DQNAgent(object):
 
 
         if self.use_consistency_loss_dfqd:
-            next_state_values_ref = next_state_values
+            next_state_values_ref = next_state_action_values
             next_states_qs = self.policy_net(non_final_next_states)
 
             consistency_loss = self.consistency_loss(next_state_values_ref, next_states_qs, self.regression_loss)

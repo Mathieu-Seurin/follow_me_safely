@@ -1,12 +1,12 @@
 {
-  "name": "margin0_feedback05_consist1_explo",
+  "name": "margin0_feedback05_consist1_explo_quick",
 
   "dqn_params": {
     "exploration_method": {
       "expected_step_explo" : 70000
     },
 
-    "update_every_n_ep" : 10,
+    "update_every_n_ep" : 6,
 
     "use_consistency_loss" : true,
     "consistency_loss_weight" : 1,

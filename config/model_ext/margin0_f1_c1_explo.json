@@ -1,7 +1,11 @@
 {
-  "name": "margin0_feedback1_consist1",
+  "name": "margin0_feedback1_consist1_explo",
 
   "dqn_params": {
+
+    "exploration_method": {
+      "expected_step_explo" : 70000
+    },
 
     "update_every_n_ep" : 10,
 

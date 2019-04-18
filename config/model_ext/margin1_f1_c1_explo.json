@@ -1,5 +1,5 @@
 {
-  "name": "margin0_feedback05_consist1_explo",
+  "name": "margin1_feedback1_consist1_explo",
 
   "dqn_params": {
     "exploration_method": {
@@ -12,8 +12,8 @@
     "consistency_loss_weight" : 1,
 
     "use_margin_loss" : true,
-    "classification_margin" : 0,
-    "classification_loss_weight" : 0.5
+    "classification_margin" : 1,
+    "classification_loss_weight" : 1
 
   }
 }

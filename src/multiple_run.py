@@ -27,9 +27,12 @@ def read_multiple_config_file(config_path):
     for ext in json_config["model_ext"]:
         expe_config = {}
         expe_config["env_config"] = json_config["common"]["env_config"]
-        expe_config["env_ext"] = ''
         expe_config["model_config"] = json_config["common"]["model_config"]
         expe_config["seed"] = json_config["common"]["seed"]
+
+        expe_config["exp_dir"] = "out"
+        expe_config["env_ext"] = ''
+        expe_config["local_test"] = False
 
         expe_config["model_ext"] = ext
 
@@ -47,6 +50,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     configs = read_multiple_config_file(args.multiple_run_config)
+    print(configs)
 
-    ray.init(num_gpus=2)
+    ray.init(num_gpus=args.n_gpus)
     ray.get([train.remote(**config) for config in configs])
