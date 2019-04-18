@@ -35,6 +35,48 @@ class ReplayMemory(object):
         return len(self.memory)
 
 
+class ProportionReplayMemory(object):
+
+    def __init__(self, proportion, capacity):
+
+        self.capacity = capacity
+        self.proportion = proportion
+
+        self.memory = []
+        self.position = 0
+
+        self.memory_feedback = []
+        self.position_feedback = 0
+
+    def push(self, *args):
+        """Saves a transition."""
+
+        if args[4]: # Gave feedback
+            if len(self.memory_feedback) < self.capacity:
+                self.memory_feedback.append(None)
+            self.memory_feedback[self.position_feedback] = Transition(*args)
+            self.position_feedback = (self.position_feedback + 1) % self.capacity
+        else:
+            if len(self.memory) < self.capacity:
+                self.memory.append(None)
+            self.memory[self.position] = Transition(*args)
+            self.position = (self.position + 1) % self.capacity
+
+    def sample(self, batch_size):
+
+        batch_size_feed = int(batch_size * self.proportion)
+
+        # Sample from memory who stores non-feedback tuple
+        samples = [self.memory[sample] for sample in np.random.choice(len(self), batch_size - batch_size_feed)]
+        # Add sample from feedback tuple
+        samples.extend([self.memory_feedback[sample] for sample in np.random.choice(len(self), batch_size_feed)])
+
+        return samples
+
+    def __len__(self):
+        return len(self.memory)
+
+
 def freeze_as_np_dict(tensor_dict):
     out = {}
     for key in tensor_dict.keys():
@@ -66,9 +108,20 @@ def compute_slow_params_update(slow_params, fast_params, tau):
     return slow_params_dict
 
 
-def consistency_loss(qs, action, feedback, regression_loss):
+def consistency_loss_feedback(regression_loss):
     pass
 
+
+def consistency_loss_dqfd(next_qs_target, next_qs, regression_loss):
+    """
+    This loss enforce next_q to be consistent with target network, to avoid over-generalization
+    """
+    assert next_qs_target.requires_grad == False, "qs_target should be a reference, requires_grad should be false, is {}".format(next_qs_target.requires_grad)
+    assert next_qs.requires_grad == True, "next_qs requires_grad should be True, is {}".format(next_qs.requires_grad)
+
+    assert next_qs_target.size() == next_qs.size()
+
+    return regression_loss(next_qs_target, next_qs)
 
 def feedback_loss(qs, action, feedback, margin, regression_loss):
     """

@@ -1,4 +1,4 @@
-from rl_agent.agent_utils import Transition, ReplayMemory, check_params_changed, feedback_loss
+from rl_agent.agent_utils import Transition, ReplayMemory, check_params_changed, feedback_loss, consistency_loss_dqfd
 import torch
 import torch.nn.functional as F
 
@@ -25,14 +25,21 @@ class DQNAgent(object):
 
         self.num_update = 0
 
-        if config.get("use_margin_loss", False):
+        self.regression_loss = F.mse_loss
+
+        # Use the feedback from the environment (aka : "Don't do this anymore!")
+        self.use_feedback_loss = config["use_margin_loss"]
+        if self.use_feedback_loss :
             self.classification_margin = config["classification_margin"]
             self.feedback_loss = feedback_loss
-            self.regression_loss = F.mse_loss
             self.classification_loss_weight = config["classification_loss_weight"]
 
-        else:
-            self.feedback_loss = lambda *args,**kwargs: 0
+        # Temporal Consistency loss : see https://arxiv.org/pdf/1805.11593.pdf
+        # To avoid over generalization
+        self.use_consistency_loss_dfqd = config["use_consistency_loss"]
+        if self.use_consistency_loss_dfqd:
+            self.consistency_loss = consistency_loss_dqfd
+            self.consistency_loss_weight = config["consistency_loss_weight"]
 
         Model = FullyConnectedModel if config["model_type"] == "fc" else ConvModel
 
@@ -134,15 +141,9 @@ class DQNAgent(object):
         # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
         # columns of actions taken. These are the actions which would've been taken
         # for each batch state according to policy_net
-        state_action_values = self.policy_net(state_batch)
+        state_values = self.policy_net(state_batch)
 
-        feedback_loss = self.feedback_loss(qs=state_action_values,
-                                           action=action_batch,
-                                           feedback=feedback_batch,
-                                           margin=self.classification_margin,
-                                           regression_loss=self.regression_loss)
-
-        state_action_values = state_action_values.gather(1, action_batch)
+        state_action_values = state_values.gather(1, action_batch)
 
         # Compute V(s_{t+1}) for all next states.
         # Expected values of actions for non_final_next_states are computed based
@@ -159,8 +160,30 @@ class DQNAgent(object):
         assert state_action_values.size() == expected_state_action_values.size()
         q_loss = F.smooth_l1_loss(state_action_values, expected_state_action_values)
 
-        # Compute the 2 losses
-        loss = q_loss + self.classification_loss_weight * feedback_loss
+        if self.use_feedback_loss:
+            feedback_loss = self.feedback_loss(qs=state_values,
+                                               action=action_batch,
+                                               feedback=feedback_batch,
+                                               margin=self.classification_margin,
+                                               regression_loss=self.regression_loss)
+
+            feedback_loss_weighted = feedback_loss * self.classification_loss_weight
+        else:
+            feedback_loss_weighted = 0
+
+
+        if self.use_consistency_loss_dfqd:
+            next_state_values_ref = next_state_values
+            next_states_qs = self.policy_net(non_final_next_states)
+
+            consistency_loss = self.consistency_loss(next_state_values_ref, next_states_qs, self.regression_loss)
+            consistency_loss_weighted = consistency_loss * self.consistency_loss_weight
+        else:
+            consistency_loss_weighted = 0
+
+        # Compute the sum of all losses
+        loss = q_loss + feedback_loss_weighted + consistency_loss_weighted
+
 
         # Optimize the model
         self.optimizer.zero_grad()

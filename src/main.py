@@ -18,7 +18,6 @@ import time
 
 from env_tools.car_racing import CarRacingSafe
 
-
 parser = argparse.ArgumentParser('Log Parser arguments!')
 
 parser.add_argument("-env_config",   type=str)
