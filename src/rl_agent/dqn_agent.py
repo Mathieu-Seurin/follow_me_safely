@@ -10,7 +10,7 @@ from rl_agent.gpu_utils import TORCH_DEVICE
 
 class DQNAgent(object):
 
-    def __init__(self, config, n_action, state_dim, discount_factor, biased_sampling):
+    def __init__(self, config, n_action, state_dim, discount_factor):
 
         self.discount_factor = discount_factor
         self.n_action = n_action.n
@@ -60,11 +60,14 @@ class DQNAgent(object):
             self.minimum_epsilon = config["exploration_method"]["epsilon_minimum"]
             self.n_step_eps = 0
 
-            self.biased_sampling = biased_sampling
-            self.action_proba = np.zeros(self.n_action)
-            self.action_proba[1], self.action_proba[5], self.action_proba[9] = 1, 1, 1
-            self.action_proba = self.action_proba * 14 + 1
-            self.action_proba /= np.sum(self.action_proba)
+            if config["biased_sampling"]:
+                self.action_proba = np.zeros(self.n_action)
+                self.action_proba[1], self.action_proba[5], self.action_proba[9] = 1, 1, 1
+                self.action_proba = self.action_proba * 14 + 1
+                self.action_proba /= np.sum(self.action_proba)
+            else:
+                self.action_proba = np.ones(self.n_action)
+                self.action_proba /= np.sum(self.action_proba)
 
         else:
             raise NotImplementedError("Boltzman explo not available ({})".format(config["exploration_method"]["name"]))

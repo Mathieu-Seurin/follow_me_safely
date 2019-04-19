@@ -82,8 +82,8 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
         model = DQNAgent(config=full_config["dqn_params"],
                          n_action=game.action_space,
                          state_dim=game.observation_space,
-                         discount_factor=discount_factor,
-                         biased_sampling=full_config["biased_sampling"])
+                         discount_factor=discount_factor
+                         )
     else:
         raise NotImplementedError("{} not available for model".format(full_config["agent_type"]))
 
