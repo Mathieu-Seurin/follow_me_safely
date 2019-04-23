@@ -1,5 +1,5 @@
 {
-  "name": "dqn_conv_agent_update_4_biased",
+  "name": "dqn_conv_agent_update_4_unbiased",
 
   "agent_type" : "dqn",
   "discount_factor": 0.999,
@@ -37,7 +37,8 @@
 
     },
 
-    "biased_sampling" : true,
+    "biased_sampling" : false,
+
 
     "update_every_n_ep" : 4,
 

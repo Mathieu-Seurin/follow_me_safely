@@ -1,4 +1,4 @@
-from rl_agent.agent_utils import Transition, ReplayMemory, check_params_changed, feedback_loss, consistency_loss_dqfd
+from rl_agent.agent_utils import Transition, ReplayMemory, ProportionReplayMemory, check_params_changed, feedback_loss, consistency_loss_dqfd
 import torch
 import torch.nn.functional as F
 
@@ -8,9 +8,11 @@ from copy import copy, deepcopy
 
 from rl_agent.gpu_utils import TORCH_DEVICE
 
+import tensorboardX
+
 class DQNAgent(object):
 
-    def __init__(self, config, n_action, state_dim, discount_factor):
+    def __init__(self, config, n_action, state_dim, discount_factor, writer=None):
 
         self.discount_factor = discount_factor
         self.n_action = n_action.n
@@ -19,7 +21,13 @@ class DQNAgent(object):
         self.weight_decay = config["weight_decay"]
         self.batch_size = config["batch_size"]
 
-        self.memory = ReplayMemory(config["memory_size"])
+        if config["memory"] == "simple":
+            self.memory = ReplayMemory(config["memory_size"])
+        elif config["memory"] == "proportionnal":
+            self.memory = ProportionReplayMemory(proportion=config["feedback_percentage"],
+                                                 capacity=config["memory_size"])
+        else:
+            raise NotImplementedError("Memory type '{}' doesn't exist".format(config["memory"]))
 
         self.update_every_n_ep = config["update_every_n_ep"]
 
@@ -60,7 +68,8 @@ class DQNAgent(object):
             self.minimum_epsilon = config["exploration_method"]["epsilon_minimum"]
             self.n_step_eps = 0
 
-            if config["biased_sampling"]:
+            self.biased_sampling = config["biased_sampling"]
+            if self.biased_sampling:
                 self.action_proba = np.zeros(self.n_action)
                 self.action_proba[1], self.action_proba[5], self.action_proba[9] = 1, 1, 1
                 self.action_proba = self.action_proba * 14 + 1
@@ -72,9 +81,11 @@ class DQNAgent(object):
         else:
             raise NotImplementedError("Boltzman explo not available ({})".format(config["exploration_method"]["name"]))
 
+        self.summary_writer = writer
+
     def select_action_greedy(self, state):
 
-        if np.random.random() > self.minimum_epsilon:
+        if np.random.random() > 0.01:
             with torch.no_grad():
                 # t.max(1) will return largest column value of each row.
                 # second column on max result is index of where max element was
@@ -104,11 +115,8 @@ class DQNAgent(object):
                 qs = self.policy_net(state.to(TORCH_DEVICE))
                 return qs.max(1)[1].view(1, 1).to('cpu')
         else:
-            if self.biased_sampling:
-                act = np.random.choice(self.n_action, p=self.action_proba)
-                return torch.tensor([[act]], dtype=torch.long)
-            else:
-                return torch.tensor([[np.random.randint(self.n_action)]], dtype=torch.long)
+            act = np.random.choice(self.n_action, p=self.action_proba)
+            return torch.tensor([[act]], dtype=torch.long)
 
 
     def push(self, *args):
@@ -140,6 +148,9 @@ class DQNAgent(object):
         action_batch = torch.cat(batch.action).to(TORCH_DEVICE)
         reward_batch = torch.cat(batch.reward).to(TORCH_DEVICE)
         feedback_batch = torch.cat(batch.gave_feedback).to(TORCH_DEVICE)
+
+        if self.summary_writer:
+            self.summary_writer.add_scalar("data/feedback_percentage_in_buffer", feedback_batch.mean().item(), self.num_update)
 
         # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
         # columns of actions taken. These are the actions which would've been taken

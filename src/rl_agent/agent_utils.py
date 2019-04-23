@@ -67,14 +67,14 @@ class ProportionReplayMemory(object):
         batch_size_feed = int(batch_size * self.proportion)
 
         # Sample from memory who stores non-feedback tuple
-        samples = [self.memory[sample] for sample in np.random.choice(len(self), batch_size - batch_size_feed)]
+        samples = [self.memory[sample] for sample in np.random.choice(len(self.memory), batch_size - batch_size_feed)]
         # Add sample from feedback tuple
-        samples.extend([self.memory_feedback[sample] for sample in np.random.choice(len(self), batch_size_feed)])
+        samples.extend([self.memory_feedback[sample] for sample in np.random.choice(len(self.memory_feedback), batch_size_feed)])
 
         return samples
 
     def __len__(self):
-        return len(self.memory)
+        return len(self.memory)+len(self.memory_feedback)
 
 
 def freeze_as_np_dict(tensor_dict):

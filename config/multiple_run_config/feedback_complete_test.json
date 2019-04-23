@@ -1,20 +1,18 @@
 {
   "common" : {
     "env_config" : "car_racing_safe.json",
-    "model_config" : "cnn_basic.json",
-    "seed" : 42
+    "model_config" : "cnn_basic_unbiased_memory025.json",
+    "seed" : 43
   },
 
   "model_ext" :
           [
             "margin0_f1_c1.json",
-            "margin0_f1_c1_explo.json",
+            "margin01_f05_c05_explo_quick.json",
             "margin0_f05_c1.json",
-            "margin0_f01_c05_explo_quick.json",
             "margin0_f05_c1_explo.json",
             "margin0_f05_c1_explo_quick.json",
             "margin1_f1_c1.json",
-            "margin1_f1_c1_explo.json",
             "margin0_f05_c05_explo_quick.json"
           ]
 }

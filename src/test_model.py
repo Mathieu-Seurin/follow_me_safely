@@ -70,13 +70,12 @@ if model_type == "dqn" :
     model = DQNAgent(config=full_config["dqn_params"],
                      n_action=game.action_space,
                      state_dim=game.observation_space,
-                     discount_factor=discount_factor,
-                     biased_sampling=full_config["biased_sampling"])
+                     discount_factor=discount_factor)
 else:
     raise NotImplementedError("{} not available for model".format(full_config["agent_type"]))
 
 
-model.policy_net.load_state_dict(torch.load(os.path.join(expe_path, 'last_model.pth'), map_location='cpu'))
+model.policy_net.load_state_dict(torch.load(os.path.join(expe_path, 'best_model.pth'), map_location='cpu'))
 print(expe_path)
 
 

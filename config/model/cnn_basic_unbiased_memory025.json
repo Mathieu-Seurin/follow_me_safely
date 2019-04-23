@@ -1,5 +1,5 @@
 {
-  "name": "dqn_conv_agent_update_4_biased",
+  "name": "dqn_conv_agent_update_4_unbiased_memory025",
 
   "agent_type" : "dqn",
   "discount_factor": 0.999,
@@ -19,7 +19,9 @@
 
     },
 
-    "memory" : "simple",
+    "memory" : "proportionnal",
+    "feedback_percentage" : 0.25,
+
     "memory_size": 40000,
 
     "clamp_grad": true,
@@ -37,7 +39,7 @@
 
     },
 
-    "biased_sampling" : true,
+    "biased_sampling" : false,
 
     "update_every_n_ep" : 4,
 
