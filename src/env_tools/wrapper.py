@@ -102,7 +102,7 @@ class FrameStackWrapper(gym.Wrapper):
         self.empty_image = np.zeros(env.observation_space.spaces['state'].shape)
         self.empty_feedback = 0
 
-        self.frames_before_zoom_end = 48 # Number of step for the zoom to end, fuck this shit.
+        self.frames_before_zoom_end = 5 # Number of step for the zoom to end
 
         self.early_reset = early_reset
         self.min_reward_before_reset = 12
@@ -182,7 +182,7 @@ class FrameStackWrapper(gym.Wrapper):
         (to avoid having black frame at the beginning)
         """
 
-        super().reset()
+        obs = super().reset()
         dont_move_action = self.env.dont_move_action
 
         # Don't apply early reset when initializing
