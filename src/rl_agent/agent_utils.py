@@ -125,6 +125,61 @@ def consistency_loss_dqfd(next_qs_target, next_qs, regression_loss):
 
 def feedback_loss(qs, action, feedback, margin, regression_loss):
     """
+    Compute the expert loss when action is flagged as bad AND is the max q
+
+    ab is the "bad" action
+    m is a margin function
+
+    Can be written as :
+    Minimize    Q(s,ab) - min_a [ Q(s,a) - m(ab, a) ]
+                                          m(ab,b) = margin if ab = a
+                                                  = 0 else
+
+    VERSION 2 : Applied only when Q(s,ab) is the max Q
+    """
+
+    # No action was flagged as 'bad' so it's okay
+    if feedback.sum() == 0:
+        return 0
+
+    # Ignore qs where the action is not flagged as bad
+    n_action = qs.size(1)
+    qs_where_bad = qs[feedback != 0]
+    action_where_bad = action[feedback != 0]
+
+    # Q(s, ab) => action taken was bad (feedback from env)
+    qs_a_where_bad = qs_where_bad.gather(1, action_where_bad.view(-1,1))
+
+    # Ignore q(s,ab) where q(s,ab) != max_a q(s,a)
+    index_where_action_bad_max = qs_a_where_bad.view(-1) == torch.max(qs_where_bad, dim=1)[0]
+    qs_a_where_bad = qs_a_where_bad[index_where_action_bad_max].view(-1)
+    if qs_a_where_bad.size(0) == 0:
+        return 0
+
+    action_where_bad = action_where_bad[index_where_action_bad_max]
+    qs_where_bad = qs_where_bad[index_where_action_bad_max]
+
+    #  =====  Compute l(a_b, a) =====
+    action_mask = torch.arange(n_action).unsqueeze(0).to(TORCH_DEVICE) != action_where_bad.view(-1, 1)
+    # action_mask is the same size as qs. for every row, there is a 0 in column of action, 1 elsewhere
+    # Exemple : action = [0, 1, 0] action_mask = [[0,1],[1,0],[0,1]]
+
+    margin_malus = action_mask.float() * margin
+
+    # Compute Q(s,a) - l(a_b, a)
+    ref_qs = qs_where_bad.detach() # You optimize with respect to this ref_qs minus the margin, so you need to detach
+    min_qs_minus_margin, _ = torch.min(ref_qs - margin_malus, dim=1)
+
+    # Actual classification loss
+    assert min_qs_minus_margin.size() == qs_a_where_bad.size(), \
+        "Problem in loss, size 1 {}  size 2 : {}".format(min_qs_minus_margin.size(), qs_a_where_bad.size())
+
+    loss = regression_loss(min_qs_minus_margin, qs_a_where_bad) # Bring bad action down under margin
+    return loss
+
+
+def _feedback_loss(qs, action, feedback, margin, regression_loss):
+    """
     Compute the expert loss
 
     ab is the "bad" action
@@ -146,10 +201,10 @@ def feedback_loss(qs, action, feedback, margin, regression_loss):
     action_where_bad = action[feedback != 0]
 
     # Q(s, ab) => action taken was bad (feedback from env)
-    qs_a_where_bad = qs_where_bad.gather(1, action_where_bad.view(-1,1))
+    qs_a_where_bad = qs_where_bad.gather(1, action_where_bad.view(-1,1)).squeeze(1)
 
     #  =====  Compute l(a_b, a) =====
-    action_mask = torch.arange(n_action).unsqueeze(0).to(TORCH_DEVICE) != action_where_bad
+    action_mask = torch.arange(n_action).unsqueeze(0).to(TORCH_DEVICE) != action_where_bad.view(-1, 1)
     # action_mask is the same size as qs. for every row, there is a 0 in column of action, 1 elsewhere
     # Exemple : action = [0, 1, 0] action_mask = [[0,1],[1,0],[0,1]]
 
@@ -160,6 +215,8 @@ def feedback_loss(qs, action, feedback, margin, regression_loss):
     min_qs_minus_margin, _ = torch.min(ref_qs - margin_malus, dim=1)
 
     # Actual classification loss
+    assert min_qs_minus_margin.size() == qs_a_where_bad.size(),\
+        "Problem in loss, size 1 {}  size 2 : {}".format(min_qs_minus_margin.size(), qs_a_where_bad.size())
     loss = regression_loss(min_qs_minus_margin, qs_a_where_bad) # Bring bad action down under margin
     return loss
 
@@ -168,13 +225,29 @@ def feedback_loss(qs, action, feedback, margin, regression_loss):
 if __name__ == "__main__":
 
     import torch
+    TORCH_DEVICE = 'cpu'
+    regr_loss = torch.nn.functional.smooth_l1_loss
 
+    # Test 1
     qs = torch.arange(12).view(4,3).float()
-    actions = torch.Tensor([0,2,1,0]).long()
+    actions = torch.Tensor([0,0,0,0]).long()
     feedback = torch.Tensor([1,1,1,0])
 
     margin = 0.1
-    regr_loss = torch.nn.functional.smooth_l1_loss
+    assert _feedback_loss(qs, actions, feedback, margin, regr_loss) == 0
 
-    print(feedback_loss(qs, actions, feedback, margin, regr_loss))
+    # Test 2
+    qs = torch.arange(12).view(4,3).float()
+    actions = torch.Tensor([0,0,0,0]).long()
+    feedback = torch.Tensor([1,1,1,0])
+    loss1 = feedback_loss(qs, actions, feedback, margin, regr_loss)
+
+    qs = torch.arange(12).view(4,3).float()
+    actions = torch.Tensor([0,1,2,0]).long()
+    feedback = torch.Tensor([1,1,1,0])
+    loss2 = feedback_loss(qs, actions, feedback, margin, regr_loss)
+
+    assert loss1 < loss2
+
+    print("Tests okay !")
 

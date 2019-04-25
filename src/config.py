@@ -1,5 +1,14 @@
 import json
 import os
+import itertools as it
+
+from copy import deepcopy
+
+DEFAULT_CONFIG = {
+    "model_ext" : '',
+    "seed": 42,
+    "exp_dir": "out",
+    "local_test": False}
 
 def override_config_recurs(config, config_extension):
 
@@ -17,11 +26,8 @@ def override_config_recurs(config, config_extension):
 
     return config
 
-def load_single_config(config_file):
-    with open(config_file, 'rb') as f_config:
-        config_str = f_config.read().decode('utf-8')
-        config = json.loads(config_str)
-    return config
+def load_single_config(config_path):
+    return json.load(open(config_path, "r"))
 
 def check_json_intregrity(config_file_path, config_dict):
     config_file = open(config_file_path, 'r')
@@ -44,12 +50,19 @@ def load_config(env_config_file, model_config_file, seed,
 
     # === Loading ENV config, extension and check integrity =====
     # ===========================================================
-    env_config = load_single_config(os.path.join("config","env",env_config_file))
+    env_config = load_single_config(os.path.join("config", "env", env_config_file))
 
     # Override env file if specified
+    # Can be a dict of parameters or a str indicating the path to the extension
     if env_ext_file:
-        env_ext_config = load_single_config(os.path.join("config", "env_ext", env_ext_file))
-        env_config = override_config_recurs(env_config, env_ext_config)
+        if type(env_ext_file) is str:
+            env_ext = load_single_config(os.path.join("config","env_ext",env_ext_file))
+        else:
+            assert type(env_ext_file) is dict, "Not a dict problem, type : {}".format(type(env_ext_file))
+            env_ext = env_ext_file
+
+        env_config = override_config_recurs(env_config, env_ext)
+
 
     # create env_file if necessary
     env_name = env_config["name"]
@@ -114,6 +127,69 @@ def load_config(env_config_file, model_config_file, seed,
         print("Warning, experiment already exists, overriding it.")
 
     return full_config, model_path
+
+def read_multiple_ext_file(config_path):
+
+    json_config = json.load(open(os.path.join("config/multiple_run_config", config_path), "r"))
+
+    all_expe_to_run = []
+    for ext in json_config["model_ext"]:
+
+        expe_config = DEFAULT_CONFIG
+        expe_config.update(json_config["common"])
+
+        expe_config["model_ext"] = ext
+
+        all_expe_to_run.append(expe_config)
+
+    return all_expe_to_run
+
+def read_multiple_config_file(config_path):
+
+    json_config = json.load(open(os.path.join("config/multiple_run_config", config_path), "r"))
+    assert type(json_config) == list, "Should be a list"
+
+    all_expe_to_run = []
+
+    for config in json_config:
+
+        expe_config = DEFAULT_CONFIG
+        expe_config.update(config)
+        all_expe_to_run.append(config)
+
+    return all_expe_to_run
+
+def create_grid_search_config(grid_path):
+
+    grid_config = json.load(open(os.path.join("config", "multiple_run_config", grid_path), 'r'))
+
+    all_expe_to_run = []
+
+    param_storage = dict()
+    param_storage["key_order"] = []
+    param_storage["lists"] = []
+
+    for key in grid_config["dqn_params"].keys():
+        param_storage["key_order"].append(key)
+        param_storage["lists"].append(grid_config["dqn_params"]["key"])
+
+    for param_tuple in it.product(param_storage["lists"]):
+
+        params_dict = dict(zip(param_storage["key_order"], param_tuple))
+        expe_ext = {"dqn_params" : params_dict}
+
+        # Join key and value in the name
+        expe_ext["name"] = '-'.join([':'.join(map(str,items)) for items in params_dict.items()])
+
+        expe_config = deepcopy(DEFAULT_CONFIG)
+        expe_config["model_ext"] = expe_ext
+        expe_config["model_config"] = grid_config["model_config"]
+        expe_config["env_config"] = grid_config["env_config"]
+
+        all_expe_to_run.append(expe_config)
+
+    return all_expe_to_run
+
 
 # =====================
 # OTHER RANDOM FUNCTION

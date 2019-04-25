@@ -1,0 +1,16 @@
+{
+  "name": "CarRacing-safe-bigbig-punish-v0",
+  "wrappers" : ["action", "frameskip"],
+
+  "reward_when_out" : -100,
+
+  "reset_when_out" : true,
+
+  "max_steps" : 1000,
+
+  "stop" : {
+    "episode_reward_mean" : 800,
+    "episodes_total" : 1000
+  }
+}
+

@@ -36,7 +36,7 @@ class DQNAgent(object):
         self.regression_loss = F.mse_loss
 
         # Use the feedback from the environment (aka : "Don't do this anymore!")
-        self.use_feedback_loss = config["use_margin_loss"]
+        self.use_feedback_loss = config["classification_loss_weight"] > 0
         if self.use_feedback_loss :
             self.classification_margin = config["classification_margin"]
             self.feedback_loss = feedback_loss
@@ -44,7 +44,7 @@ class DQNAgent(object):
 
         # Temporal Consistency loss : see https://arxiv.org/pdf/1805.11593.pdf
         # To avoid over generalization
-        self.use_consistency_loss_dfqd = config["use_consistency_loss"]
+        self.use_consistency_loss_dfqd = config["consistency_loss_weight"] > 0
         if self.use_consistency_loss_dfqd:
             self.consistency_loss = consistency_loss_dqfd
             self.consistency_loss_weight = config["consistency_loss_weight"]
@@ -149,8 +149,6 @@ class DQNAgent(object):
         reward_batch = torch.cat(batch.reward).to(TORCH_DEVICE)
         feedback_batch = torch.cat(batch.gave_feedback).to(TORCH_DEVICE)
 
-        if self.summary_writer:
-            self.summary_writer.add_scalar("data/feedback_percentage_in_buffer", feedback_batch.mean().item(), self.num_update)
 
         # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
         # columns of actions taken. These are the actions which would've been taken
@@ -210,5 +208,12 @@ class DQNAgent(object):
         for param in self.policy_net.parameters():
             param.grad.data.clamp_(-1, 1)
         self.optimizer.step()
+
+        if self.summary_writer:
+            self.summary_writer.add_scalar("data/feedback_percentage_in_buffer", feedback_batch.mean().item(), self.num_update)
+            self.summary_writer.add_histogram("data/reward_in_batch_replay_buffer", reward_batch.detach().cpu().numpy(), self.num_update, bins=4)
+            #self.summary_writer.add_histogramm("data/q_values", state_values.mean, self.num_update, bins=4)
+
+
 
         #check_params_changed(old_params, self.policy_net.state_dict())

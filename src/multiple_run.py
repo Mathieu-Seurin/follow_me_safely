@@ -5,52 +5,40 @@ import json
 import ray
 
 import os
+from config import read_multiple_ext_file, read_multiple_config_file, create_grid_search_config
 
 @ray.remote(num_gpus=0.3)
-def dummy_train(a = 10):
+def dummy_train_gpu(a):
     import torch
     print(a)
     print(torch.cuda.is_available())
 
 @ray.remote
-def dummy_train2(a = 10):
+def dummy_train(a):
     import torch
     print(a)
     print(torch.cuda.is_available())
-
-
-def read_multiple_config_file(config_path):
-
-    json_config = json.load(open(os.path.join("config/multiple_run_config", config_path), "r"))
-
-    all_expe_to_run = []
-    for ext in json_config["model_ext"]:
-        expe_config = {}
-        expe_config["env_config"] = json_config["common"]["env_config"]
-        expe_config["model_config"] = json_config["common"]["model_config"]
-        expe_config["seed"] = json_config["common"]["seed"]
-
-        expe_config["exp_dir"] = "out"
-        expe_config["env_ext"] = ''
-        expe_config["local_test"] = False
-
-        expe_config["model_ext"] = ext
-
-        all_expe_to_run.append(expe_config)
-
-    return all_expe_to_run
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser('Log Parser arguments!')
 
+    parser.add_argument("-multiple_ext_config", type=str)
     parser.add_argument("-multiple_run_config", type=str)
+    parser.add_argument("-grid_search_config", type=str)
     parser.add_argument("-n_gpus", type=int, default=4)
 
     args = parser.parse_args()
 
-    configs = read_multiple_config_file(args.multiple_run_config)
-    print(configs)
+    configs = []
+    if args.multiple_run_config:
+        configs.extend(read_multiple_ext_file(args.multiple_run_config))
+
+    if args.multiple_ext:
+        configs.extend(read_multiple_ext_file(args.multiple_ext))
+
+    if args.grid_search_config:
+        configs.extend(create_grid_search_config(args.grid_search_config))
 
     ray.init(num_gpus=args.n_gpus)
-    ray.get([train.remote(**config) for config in configs])
+    ray.get([dummy_train.remote(**config) for config in configs])

@@ -43,7 +43,6 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
     writer = tensorboardX.SummaryWriter(expe_path)
     log_every = 100
 
-
     if "safe" in full_config["env_name"].lower():
         reset_when_out = full_config["reset_when_out"]
         reward_when_out = full_config["reward_when_out"]
@@ -82,7 +81,8 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
         model = DQNAgent(config=full_config["dqn_params"],
                          n_action=game.action_space,
                          state_dim=game.observation_space,
-                         discount_factor=discount_factor
+                         discount_factor=discount_factor,
+                         writer=writer
                          )
     else:
         raise NotImplementedError("{} not available for model".format(full_config["agent_type"]))

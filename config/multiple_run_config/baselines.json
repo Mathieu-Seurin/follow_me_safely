@@ -1,0 +1,16 @@
+[
+  {
+    "model_config": "cnn_basic.json",
+    "env_config": "car_racing_safe.json"
+  },
+
+  {
+    "model_config": "cnn_basic.json",
+    "env_config": "car_racing_big_punish.json"
+  },
+
+  {
+    "model_config": "cnn_basic.json",
+    "env_config": "car_racing_bigbig_punish.json"
+  }
+]
