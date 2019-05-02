@@ -3,7 +3,10 @@ import argparse
 import gym.wrappers
 from env_tools.wrapper import PreprocessWrapperPytorch, FrameStackWrapper, CarActionWrapper
 
+import matplotlib
 import matplotlib.pyplot as plt
+matplotlib.use('agg')
+
 
 from config import load_config
 from rl_agent.dqn_agent import DQNAgent
@@ -20,7 +23,7 @@ import ray
 from env_tools.car_racing import CarRacingSafe
 
 @ray.remote(num_gpus=0.5)
-def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_test):
+def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_test, save_images_freq=3):
 
     print("Expe",env_config, env_ext, model_config, model_ext, exp_dir, seed, sep='  ')
     print("Is cuda available ?", torch.cuda.is_available())
@@ -112,16 +115,45 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
                 next_state['state'] = torch.FloatTensor(next_state['state']).unsqueeze(0)
                 next_state['gave_feedback'] = torch.FloatTensor([next_state['gave_feedback']])
 
-                #game.render()
-                # if done:
-                #     next_state = None
-
                 model.push(state['state'].to('cpu'), action, next_state['state'], reward, next_state['gave_feedback'])
                 if not local_test:
                     model.optimize()
 
-                # plt.imshow(game._unconvert(state['state'][0][0].numpy()))
-                # plt.show()
+                if num_episode % save_images_freq == 0:
+
+                    q = model.get_q_values(state['state'])
+                    max_action = torch.max(q, dim=1)[1].item()
+
+                    fig = plt.figure()
+                    fig.add_subplot(121)
+
+                    plt.imshow(game._unconvert(next_state['state'].numpy()[0, 2, :, :]))
+
+                    f = plt.gcf()
+                    f.set_size_inches(18.5, 10.5)
+
+                    fig.add_subplot(122)
+
+                    plt.bar(list(range(game.action_space.n)), height=q[0, :].cpu(),
+                            color=[(0.1, 0.2, 0.8) if i != max_action else (0.8, 0.1, 0.1) for i in
+                                   range(game.action_space.n)], tick_label=[str(l) for l in game.env.action_map])
+
+                    plt.xticks(fontsize=18, rotation=70)
+
+                    plt.xlabel('action', fontsize=16)
+                    plt.ylabel('q_value', fontsize=16)
+
+                    plt.tight_layout()
+
+                    fig.canvas.draw()
+                    array_rendered = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep='')
+                    array_rendered = array_rendered.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+
+                    #X = np.array(fig.canvas)
+
+                    writer.add_image('data/state_and_q', img_tensor=array_rendered, dataformats="HWC")
+                    #plt.show()
+                    plt.close()
 
                 state = next_state
 

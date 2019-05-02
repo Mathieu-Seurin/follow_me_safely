@@ -1,19 +1,28 @@
 {
+  "model_config" : "cnn_basic.json",
+  "env_config" : "car_racing_safe.json",
+
   "dqn_params": {
 
+    "feedback_proportion_replayed" : [0.05, 0.1],
 
-    "memory" : "simple",
+    "learning_rate": [5e-4, 1e-3],
 
-    "learning_rate": 5e-4,
+    "consistency_loss_weight" : [0, 0.5, 1],
 
-    "consistency_loss_weight" : 0,
+    "classification_margin" : [0, 0.01, 0.1, 0.8],
 
-    "classification_margin" : 0,
-    "classification_loss_weight" : 0
+    "classification_loss_weight" : [0, 0.2, 0.7, 1],
+    "classification_max_loss_weight" : [0, 0.2, 0.7, 1]
 
   },
 
-  "cannot_be_both_true" :
+  "only_one_required" : [
+    [
+      "classification_max_loss_weight",
+      "classification_loss_weight"
+    ]
+  ]
 
 
 

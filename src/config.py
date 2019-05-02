@@ -5,9 +5,10 @@ import itertools as it
 from copy import deepcopy
 
 DEFAULT_CONFIG = {
+    "env_ext" : '',
     "model_ext" : '',
     "seed": 42,
-    "exp_dir": "out",
+    "exp_dir": "grid_out",
     "local_test": False}
 
 def override_config_recurs(config, config_extension):
@@ -63,6 +64,8 @@ def load_config(env_config_file, model_config_file, seed,
 
         env_config = override_config_recurs(env_config, env_ext)
 
+    if not os.path.exists(out_dir):
+        os.mkdir(out_dir)
 
     # create env_file if necessary
     env_name = env_config["name"]
@@ -153,9 +156,9 @@ def read_multiple_config_file(config_path):
 
     for config in json_config:
 
-        expe_config = DEFAULT_CONFIG
+        expe_config = deepcopy(DEFAULT_CONFIG)
         expe_config.update(config)
-        all_expe_to_run.append(config)
+        all_expe_to_run.append(expe_config)
 
     return all_expe_to_run
 
@@ -171,9 +174,9 @@ def create_grid_search_config(grid_path):
 
     for key in grid_config["dqn_params"].keys():
         param_storage["key_order"].append(key)
-        param_storage["lists"].append(grid_config["dqn_params"]["key"])
+        param_storage["lists"].append(grid_config["dqn_params"][key])
 
-    for param_tuple in it.product(param_storage["lists"]):
+    for param_tuple in it.product(*param_storage["lists"]):
 
         params_dict = dict(zip(param_storage["key_order"], param_tuple))
         expe_ext = {"dqn_params" : params_dict}
@@ -187,6 +190,26 @@ def create_grid_search_config(grid_path):
         expe_config["env_config"] = grid_config["env_config"]
 
         all_expe_to_run.append(expe_config)
+
+
+    expe_to_filter = []
+
+    # Filter list : delete expe who doesn't have at least one condition specified
+    only_one_required = grid_config["only_one_required"]
+    for num_expe, expe in enumerate(all_expe_to_run):
+        for condition in only_one_required:
+            value1 = expe["model_ext"]["dqn_params"][condition[0]]
+            value2 = expe["model_ext"]["dqn_params"][condition[1]]
+
+            # if both are 0 reject, if both are positive => reject
+            if bool(value1) == bool(value2) :
+                expe_to_filter.append(num_expe)
+
+    # other filter ?
+
+    # Delete expe that are in the filter
+    for num_expe in reversed(expe_to_filter):
+        all_expe_to_run.pop(num_expe)
 
     return all_expe_to_run
 

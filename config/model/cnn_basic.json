@@ -19,7 +19,7 @@
 
     },
 
-    "memory" : "simple",
+    "feedback_percentage_in_buffer" : 0,
     "memory_size": 40000,
 
     "clamp_grad": true,
@@ -41,12 +41,11 @@
 
     "update_every_n_ep" : 4,
 
-    "use_consistency_loss" : false,
     "consistency_loss_weight" : 0,
 
-    "use_margin_loss" : false,
     "classification_margin" : 0,
-    "classification_loss_weight" : 0
+    "classification_loss_weight" : 0,
+    "classification_max_loss_weight" : 0
 
   }
 }

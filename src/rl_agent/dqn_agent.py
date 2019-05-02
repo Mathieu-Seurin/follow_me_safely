@@ -1,4 +1,4 @@
-from rl_agent.agent_utils import Transition, ReplayMemory, ProportionReplayMemory, check_params_changed, feedback_loss, consistency_loss_dqfd
+from rl_agent.agent_utils import Transition, ReplayMemory, ProportionReplayMemory, check_params_changed, feedback_bad_to_min_when_max, consistency_loss_dqfd
 import torch
 import torch.nn.functional as F
 
@@ -21,26 +21,29 @@ class DQNAgent(object):
         self.weight_decay = config["weight_decay"]
         self.batch_size = config["batch_size"]
 
-        if config["memory"] == "simple":
+        if config["feedback_percentage_in_buffer"] == 0: # no proportionnal, use classical replay buffer
             self.memory = ReplayMemory(config["memory_size"])
-        elif config["memory"] == "proportionnal":
-            self.memory = ProportionReplayMemory(proportion=config["feedback_percentage"],
-                                                 capacity=config["memory_size"])
         else:
-            raise NotImplementedError("Memory type '{}' doesn't exist".format(config["memory"]))
+            self.memory = ProportionReplayMemory(proportion=config["feedback_proportion_replayed"],
+                                                 capacity=config["memory_size"])
 
         self.update_every_n_ep = config["update_every_n_ep"]
 
         self.num_update = 0
 
+        # ============ LOSSES : Bellman, feedback, regularization ========
+        # ================================================================
         self.regression_loss = F.mse_loss
 
         # Use the feedback from the environment (aka : "Don't do this anymore!")
         self.use_feedback_loss = config["classification_loss_weight"] > 0
         if self.use_feedback_loss :
             self.classification_margin = config["classification_margin"]
-            self.feedback_loss = feedback_loss
+            self.feedback_loss = feedback_bad_to_min_when_max
             self.classification_loss_weight = config["classification_loss_weight"]
+
+
+        self.use_feedback_loss
 
         # Temporal Consistency loss : see https://arxiv.org/pdf/1805.11593.pdf
         # To avoid over generalization
@@ -48,6 +51,9 @@ class DQNAgent(object):
         if self.use_consistency_loss_dfqd:
             self.consistency_loss = consistency_loss_dqfd
             self.consistency_loss_weight = config["consistency_loss_weight"]
+
+
+        # ========== Model ===============
 
         Model = FullyConnectedModel if config["model_type"] == "fc" else ConvModel
 
@@ -95,6 +101,14 @@ class DQNAgent(object):
         else:
             return torch.tensor([[np.random.randint(self.n_action)]], dtype=torch.long)
 
+    def get_q_values(self, state):
+        with torch.no_grad():
+            # t.max(1) will return largest column value of each row.
+            # second column on max result is index of where max element was
+            # found, so we pick action with the larger expected reward.
+            qs = self.policy_net(state.to(TORCH_DEVICE))
+            return qs
+
     def _select_action_eps_greedy(self, state):
 
         # Formula for eps decay :
@@ -108,12 +122,7 @@ class DQNAgent(object):
         self.n_step_eps += 1
 
         if np.random.random() > self.current_eps:
-            with torch.no_grad():
-                # t.max(1) will return largest column value of each row.
-                # second column on max result is index of where max element was
-                # found, so we pick action with the larger expected reward.
-                qs = self.policy_net(state.to(TORCH_DEVICE))
-                return qs.max(1)[1].view(1, 1).to('cpu')
+            return self.get_q_values(state).max(1)[1].view(1, 1).to('cpu')
         else:
             act = np.random.choice(self.n_action, p=self.action_proba)
             return torch.tensor([[act]], dtype=torch.long)

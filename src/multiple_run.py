@@ -32,13 +32,14 @@ if __name__ == "__main__":
 
     configs = []
     if args.multiple_run_config:
-        configs.extend(read_multiple_ext_file(args.multiple_run_config))
+        configs.extend(read_multiple_config_file(args.multiple_run_config))
 
-    if args.multiple_ext:
+    if args.multiple_ext_config:
         configs.extend(read_multiple_ext_file(args.multiple_ext))
 
     if args.grid_search_config:
         configs.extend(create_grid_search_config(args.grid_search_config))
 
     ray.init(num_gpus=args.n_gpus)
-    ray.get([dummy_train.remote(**config) for config in configs])
+    ray.get([train.remote(**config) for config in configs])
+    #ray.get([dummy_train.remote(config) for config in configs])

@@ -123,7 +123,7 @@ def consistency_loss_dqfd(next_qs_target, next_qs, regression_loss):
 
     return regression_loss(next_qs_target, next_qs)
 
-def feedback_loss(qs, action, feedback, margin, regression_loss):
+def feedback_bad_to_min_when_max(qs, action, feedback, margin, regression_loss):
     """
     Compute the expert loss when action is flagged as bad AND is the max q
 
@@ -178,7 +178,7 @@ def feedback_loss(qs, action, feedback, margin, regression_loss):
     return loss
 
 
-def _feedback_loss(qs, action, feedback, margin, regression_loss):
+def feedback_bad_to_min(qs, action, feedback, margin, regression_loss):
     """
     Compute the expert loss
 
@@ -234,18 +234,18 @@ if __name__ == "__main__":
     feedback = torch.Tensor([1,1,1,0])
 
     margin = 0.1
-    assert _feedback_loss(qs, actions, feedback, margin, regr_loss) == 0
+    assert feedback_bad_to_min(qs, actions, feedback, margin, regr_loss) == 0
 
     # Test 2
     qs = torch.arange(12).view(4,3).float()
     actions = torch.Tensor([0,0,0,0]).long()
     feedback = torch.Tensor([1,1,1,0])
-    loss1 = feedback_loss(qs, actions, feedback, margin, regr_loss)
+    loss1 = feedback_bad_to_min_when_max(qs, actions, feedback, margin, regr_loss)
 
     qs = torch.arange(12).view(4,3).float()
     actions = torch.Tensor([0,1,2,0]).long()
     feedback = torch.Tensor([1,1,1,0])
-    loss2 = feedback_loss(qs, actions, feedback, margin, regr_loss)
+    loss2 = feedback_bad_to_min_when_max(qs, actions, feedback, margin, regr_loss)
 
     assert loss1 < loss2
 
