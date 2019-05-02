@@ -1,7 +1,7 @@
 import argparse
 
 import gym.wrappers
-from env_tools.wrapper import PreprocessWrapperPytorch, FrameStackWrapper, CarActionWrapper
+from env_tools.wrapper import PreprocessWrapperPytorch, CarFrameStackWrapper, CarActionWrapper
 
 from env_tools.car_racing import CarRacingSafe
 
@@ -53,7 +53,7 @@ if "safe" in full_config["env_name"].lower():
     n_frameskip = full_config.get("frameskip", DEFAULT_FRAME_SKIP)
 
     game = CarActionWrapper(game)
-    game = FrameStackWrapper(game, n_frameskip=n_frameskip)
+    game = CarFrameStackWrapper(game, n_frameskip=n_frameskip)
 
 else:
     game = gym.make(full_config["env_name"])

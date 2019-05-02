@@ -7,6 +7,8 @@ from skimage import color
 
 from env_tools.car_racing import CarRacingSafe
 
+from gym_minigrid.envs.safe_crossing import SafeCrossing
+
 class PreprocessWrapperPytorch(gym.core.ObservationWrapper):
     def __init__(self, env):
         super().__init__(env)
@@ -77,13 +79,13 @@ class CarActionWrapper(gym.core.ActionWrapper):
         converted_action = self.action_map[action]
         return converted_action
 
-class FrameStackWrapper(gym.Wrapper):
+class CarFrameStackWrapper(gym.Wrapper):
 
     def __init__(self, env, n_frameskip, early_reset=True):
         self.n_frameskip = n_frameskip
 
         assert self.n_frameskip > 1, "Frameskip is useless"
-        super(FrameStackWrapper, self).__init__(env)
+        super(CarFrameStackWrapper, self).__init__(env)
 
         if isinstance(env.observation_space, gym.spaces.Dict):
             base_shape = env.observation_space.spaces['state'].shape[:2]  # Deleting the channel because it's converted to grey
@@ -202,43 +204,139 @@ class FrameStackWrapper(gym.Wrapper):
         return obs
 
 
+class MinigridFrameStacker(gym.Wrapper):
+
+    def __init__(self, env, n_frameskip):
+        """
+        In MiniGrid, we want frame stacking, to avoid using a recurrent policy
+        But the action repeating is irrelevant
+
+        A state is the last *n* frames, so the wrapper job is to remember to last n-1 frames and stack the new frame
+        """
+
+        self.n_frameskip = n_frameskip
+        super().__init__(env)
+
+        observation_space = dict()
+        observation_space['gave_feedback'] = self.observation_space.spaces['gave_feedback']
+        observation_space['state'] = gym.spaces.Box(low=0, high=10, shape=(3*n_frameskip, 7, 7))
+        self.observation_space = gym.spaces.Dict(observation_space)
+
+    def stack_last_frame(self, obs):
+        new_obs = np.concatenate((*self.last_frames, obs), axis=2)
+        new_obs = new_obs.transpose((2, 0, 1))
+
+        self.last_frames.append(obs)
+        self.last_frames.pop(0)
+
+        assert len(self.last_frames) == self.n_frameskip-1
+        return new_obs
+
+    def reset(self):
+        obs = super().reset()
+
+        self.last_frames = [obs['state'] for i in range(self.n_frameskip-1)]
+
+        new_obs = dict()
+        new_obs['state'] = self.stack_last_frame(obs['state'])
+        new_obs['gave_feedback'] = False
+
+        assert self.observation_space.contains(new_obs), "Observation don't match observation space"
+        return new_obs
+
+    def step(self, action):
+
+        obs, reward, done, info  = super().step(action)
+
+        self.last_frames = [obs['state'] for i in range(self.n_frameskip - 1)]
+
+        new_obs = dict()
+        new_obs['state'] = self.stack_last_frame(obs['state'])
+        new_obs['gave_feedback'] = obs['gave_feedback']
+
+        assert self.observation_space.contains(new_obs), "Problem, observation don't match observation space."
+        return new_obs, reward, done, info
+
+
 if __name__ == "__main__" :
 
-    #from xvfbwrapper import Xvfb
-    import matplotlib.pyplot as plt
-    from skimage import data
-    import time
 
-    #with Xvfb(width=100, height=100, colordepth=16) as disp:
-    game = CarRacingSafe()
+    test_car_racing = False
+    test_minigrid = True
 
-    game = CarActionWrapper(game)
-    game = FrameStackWrapper(game)
+    # Car Racing env test
+    if test_car_racing:
 
-    init_time = time.time()
-    game.reset()
-    print("Time taken to init in seconds :", time.time() - init_time)
+        #from xvfbwrapper import Xvfb
+        import matplotlib.pyplot as plt
+        from skimage import data
+        import time
 
-    init_time = time.time()
+        #with Xvfb(width=100, height=100, colordepth=16) as disp:
+        game = CarRacingSafe()
 
-    done = False
-    step = 0
+        game = CarActionWrapper(game)
+        game = CarFrameStackWrapper(game)
 
-    while not done:
-        a = game.action_space.sample()
-        obs, rew, done, info = game.step(a)
+        init_time = time.time()
+        game.reset()
+        print("Time taken to init in seconds :", time.time() - init_time)
 
-        print(rew)
+        init_time = time.time()
 
-        assert obs['state'].shape == (3,96,96)
+        done = False
+        step = 0
 
-        plt.imshow(game._unconvert(obs['state'][0, :, :]))
-        plt.show()
-        plt.imshow(game._unconvert(obs['state'][1, :, :]))
-        plt.show()
-        plt.imshow(game._unconvert(obs['state'][2, :, :]))
-        plt.show()
+        while not done:
+            a = game.action_space.sample()
+            obs, rew, done, info = game.step(a)
 
-        step += 1
+            print(rew)
 
-    print("FPS = ", (step*3) / (time.time() - init_time))
+            assert obs['state'].shape == (3,96,96)
+
+            plt.imshow(game._unconvert(obs['state'][0, :, :]))
+            plt.show()
+            plt.imshow(game._unconvert(obs['state'][1, :, :]))
+            plt.show()
+            plt.imshow(game._unconvert(obs['state'][2, :, :]))
+            plt.show()
+
+            step += 1
+
+        print("FPS = ", (step*3) / (time.time() - init_time))
+
+
+    if test_minigrid:
+
+        # from xvfbwrapper import Xvfb
+        import matplotlib.pyplot as plt
+        from skimage import data
+        import time
+
+        n_frameskip = 3
+
+        # with Xvfb(width=100, height=100, colordepth=16) as disp:
+        game = SafeCrossing(reward_when_falling=-10)
+        game = MinigridFrameStacker(game, n_frameskip=n_frameskip)
+
+        game.reset()
+
+        done = False
+        step = 0
+
+        while not done:
+            a = game.action_space.sample()
+            obs, rew, done, info = game.step(a)
+
+            assert obs['state'].shape == (3*n_frameskip, 7, 7)
+            step += 1
+
+            if obs['gave_feedback'] :
+                print(a)
+                game.render('human')
+                time.sleep(2)
+                print(done, step)
+
+
+

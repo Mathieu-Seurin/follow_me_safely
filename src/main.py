@@ -1,7 +1,7 @@
 import argparse
 
 import gym.wrappers
-from env_tools.wrapper import PreprocessWrapperPytorch, FrameStackWrapper, CarActionWrapper
+from env_tools.wrapper import PreprocessWrapperPytorch, CarFrameStackWrapper, CarActionWrapper
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -59,7 +59,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
         n_frameskip = full_config.get("frameskip", DEFAULT_FRAME_SKIP)
 
         game = CarActionWrapper(game)
-        game = FrameStackWrapper(game, n_frameskip=n_frameskip)
+        game = CarFrameStackWrapper(game, n_frameskip=n_frameskip)
 
     else:
         game = gym.make(full_config["env_name"])
@@ -151,7 +151,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
 
                     #X = np.array(fig.canvas)
 
-                    writer.add_image('data/state_and_q', img_tensor=array_rendered, dataformats="HWC")
+                    writer.add_image('data/{}/state_and_q'.format(num_episode), global_step=iter_this_ep, img_tensor=array_rendered, dataformats="HWC")
                     #plt.show()
                     plt.close()
 
