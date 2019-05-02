@@ -3,6 +3,7 @@ import os
 import itertools as it
 
 from copy import deepcopy
+from random import shuffle
 
 DEFAULT_CONFIG = {
     "env_ext" : '',
@@ -210,6 +211,9 @@ def create_grid_search_config(grid_path):
     # Delete expe that are in the filter
     for num_expe in reversed(expe_to_filter):
         all_expe_to_run.pop(num_expe)
+
+    # Grid search become random search, yea.
+    shuffle(all_expe_to_run)
 
     return all_expe_to_run
 
