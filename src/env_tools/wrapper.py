@@ -324,19 +324,23 @@ if __name__ == "__main__" :
 
         done = False
         step = 0
+        game.render('human')
 
         while not done:
-            a = game.action_space.sample()
+
+            #a = game.action_space.sample()
+            a = int(input())
             obs, rew, done, info = game.step(a)
+
+            game.render('human')
 
             assert obs['state'].shape == (3*n_frameskip, 7, 7)
             step += 1
 
             if obs['gave_feedback'] :
-                print(a)
-                game.render('human')
                 time.sleep(2)
-                print(done, step)
+                print(rew, done, step)
 
+        print(rew, done, step)
 
 
