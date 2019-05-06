@@ -106,6 +106,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
     reward_discount_list = []
     feedback_per_ep_list = []
     percentage_tile_seen_list = []
+    iter_this_ep_list = []
 
     best_undiscount_reward = -float("inf")
 
@@ -184,6 +185,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
 
             feedback_per_ep_list.append(n_feedback_this_ep)
             percentage_tile_seen_list.append(percentage_tile_seen)
+            iter_this_ep_list.append(iter_this_ep)
 
             if reward_total_discounted > score_success:
                 success_count += 1
@@ -196,23 +198,33 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
                 reward_discount_mean = np.mean(reward_discount_list)
                 reward_undiscount_mean = np.mean(reward_undiscount_list)
 
-                print(
-                    "Reward at the end of ep #{}, n_timesteps {}, discounted rew : {} undiscounted : {}, current_eps {}".format(
-                        num_episode, total_iter, reward_discount_mean, reward_undiscount_mean, model.current_eps))
+                last_rewards_discount = np.mean(reward_discount_list[-log_stats_every:])
+                last_rewards_undiscount = np.mean(reward_undiscount_list[-log_stats_every:])
+
+                iter_this_ep_mean = np.mean(iter_this_ep_list)
+
+                last_feedback_mean = np.mean(feedback_per_ep_list)
 
                 writer.add_scalar("data/percentage_tile_seen", np.mean(percentage_tile_seen_list), total_iter)
-                writer.add_scalar("data/number_of feedback", np.mean(feedback_per_ep_list), total_iter)
+                writer.add_scalar("data/number_of feedback", last_feedback_mean, total_iter)
 
-                writer.add_scalar("data/reward_discounted", np.mean(reward_discount_list[-log_stats_every:]), total_iter)
-                writer.add_scalar("data/reward_not_discounted", np.mean(reward_undiscount_list[-log_stats_every:]), total_iter)
+                writer.add_scalar("data/reward_discounted", last_rewards_discount, total_iter)
+                writer.add_scalar("data/reward_not_discounted", last_rewards_undiscount, total_iter)
 
                 writer.add_scalar("data/running_mean_reward_discounted", reward_discount_mean, total_iter)
                 writer.add_scalar("data/running_mean_reward_not_discounted", reward_undiscount_mean, total_iter)
-                writer.add_scalar("data/iter_per_ep", iter_this_ep, total_iter)
+                writer.add_scalar("data/iter_per_ep", iter_this_ep_mean, total_iter)
                 writer.add_scalar("data/epsilon", model.current_eps, total_iter)
                 writer.add_scalar("data/model_update", model.num_update_target, total_iter)
                 writer.add_scalar("data/n_episode", num_episode, total_iter)
                 # writer.add_scalar("data/model_update_ep", model.num_update_target, num_episode)
+
+                print(
+                    "End of ep #{}, n_timesteps {}, iter_this_ep : {}, current_eps {}".format(
+                        num_episode, total_iter, iter_this_ep_mean, model.current_eps))
+
+                print("Discounted rew : {} undiscounted : {}, n_feedback {}".format(
+                    last_rewards_discount, last_rewards_undiscount, last_feedback_mean))
 
                 if reward_discount_mean > best_undiscount_reward :
                     best_undiscount_reward = reward_discount_mean
@@ -223,8 +235,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
                 # Reset feedback and percentage
                 feedback_per_ep_list = []
                 percentage_tile_seen_list = []
-
-
+                iter_this_ep_list = []
 
             num_episode += 1
 

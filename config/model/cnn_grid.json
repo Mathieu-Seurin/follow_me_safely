@@ -1,8 +1,8 @@
 {
-  "name": "dqn_conv_grid_update_4",
+  "name": "dqn_conv_grid_update_4_gamma99",
 
   "agent_type" : "dqn",
-  "discount_factor": 0.95,
+  "discount_factor": 0.99,
 
   "dqn_params": {
 

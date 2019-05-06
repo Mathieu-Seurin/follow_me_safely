@@ -228,8 +228,8 @@ class MinigridFrameStacker(gym.Wrapper):
         return x
 
     def stack_last_frame(self, obs):
-        new_obs = np.concatenate((*self.last_frames, obs), axis=2)
-        new_obs = new_obs.transpose((2, 0, 1))
+        obs = obs.transpose(2, 0, 1)
+        new_obs = np.concatenate((*self.last_frames, obs), axis=0)
 
         self.last_frames.append(obs)
         self.last_frames.pop(0)
@@ -240,7 +240,7 @@ class MinigridFrameStacker(gym.Wrapper):
     def reset(self):
         obs = super().reset()
 
-        self.last_frames = [obs['state'] for i in range(self.n_frameskip-1)]
+        self.last_frames = [obs['state'].transpose(2, 0, 1) for i in range(self.n_frameskip-1)]
 
         new_obs = dict()
         new_obs['state'] = self.stack_last_frame(obs['state'])
@@ -252,8 +252,6 @@ class MinigridFrameStacker(gym.Wrapper):
     def step(self, action):
 
         obs, reward, done, info = super().step(action)
-
-        self.last_frames = [obs['state'] for i in range(self.n_frameskip - 1)]
 
         new_obs = dict()
         new_obs['state'] = self.stack_last_frame(obs['state'])
@@ -325,7 +323,7 @@ if __name__ == "__main__" :
         game = SafeCrossing(reward_when_falling=-10)
         game = MinigridFrameStacker(game, n_frameskip=n_frameskip)
 
-        game.reset()
+        obs = game.reset()
 
         done = False
         step = 0
@@ -333,11 +331,16 @@ if __name__ == "__main__" :
 
         while not done:
 
-            #a = game.action_space.sample()
-            a = int(input())
-            obs, rew, done, info = game.step(a)
+            a = game.action_space.sample()
+            #a = int(input())
+            new_obs, rew, done, info = game.step(a)
 
             game.render('human')
+
+            assert (new_obs['state'][3:6,:,:] == obs['state'][6:,:,:]).all()
+
+            obs = new_obs
+
 
             assert obs['state'].shape == (3*n_frameskip, 7, 7)
             step += 1

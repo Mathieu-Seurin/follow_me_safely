@@ -1,0 +1,14 @@
+{
+  "name": "Minigrid-safe-size9_punish0.1",
+
+  "reward_when_out" : -0.1,
+  "size_env" : 9,
+
+  "n_frameskip" : 3,
+
+  "stop" : {
+    "episode_reward_mean" : 800,
+    "episodes_total" : 1000
+  }
+}
+
