@@ -223,7 +223,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
                     "End of ep #{}, n_timesteps {}, iter_this_ep : {}, current_eps {}".format(
                         num_episode, total_iter, iter_this_ep_mean, model.current_eps))
 
-                print("Discounted rew : {} undiscounted : {}, n_feedback {}".format(
+                print("Discounted rew : {} undiscounted : {}, n_feedback {} \n\n".format(
                     last_rewards_discount, last_rewards_undiscount, last_feedback_mean))
 
                 if reward_discount_mean > best_undiscount_reward :
