@@ -6,6 +6,9 @@
 
   "reset_when_out" : true,
 
+  "log_stats_every" : 3,
+
+
   "max_steps" : 1000,
 
   "stop" : {

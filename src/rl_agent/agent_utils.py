@@ -6,6 +6,7 @@ from rl_agent.gpu_utils import TORCH_DEVICE
 
 import logging
 
+import matplotlib.pyplot as plt
 
 # Transition = namedtuple('Transition',
 #                         ('state', 'action', 'next_state', 'reward'))
@@ -220,6 +221,43 @@ def feedback_bad_to_min(qs, action, feedback, margin, regression_loss):
     loss = regression_loss(min_qs_minus_margin, qs_a_where_bad) # Bring bad action down under margin
     return loss
 
+
+def save_images_q_values(model, game, state, writer, num_episode, iter_this_ep):
+
+    q = model.get_q_values(state['state'])
+    max_action = torch.max(q, dim=1)[1].item()
+
+    fig = plt.figure()
+    fig.add_subplot(121)
+
+    plt.imshow(game._unconvert(state))
+
+    f = plt.gcf()
+    f.set_size_inches(9, 5)
+
+    fig.add_subplot(122)
+
+    plt.bar(list(range(game.action_space.n)), height=q[0, :].cpu(),
+            color=[(0.1, 0.2, 0.8) if i != max_action else (0.8, 0.1, 0.1) for i in
+                   range(game.action_space.n)], tick_label=[str(l) for l in game.env.action_map])
+
+    plt.xticks(fontsize=18, rotation=70)
+
+    plt.xlabel('action', fontsize=16)
+    plt.ylabel('q_value', fontsize=16)
+
+    plt.tight_layout()
+
+    fig.canvas.draw()
+    array_rendered = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep='')
+    array_rendered = array_rendered.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+
+    # X = np.array(fig.canvas)
+
+    writer.add_image('data/{}/state_and_q'.format(num_episode), global_step=iter_this_ep, img_tensor=array_rendered,
+                     dataformats="HWC")
+    # plt.show()
+    plt.close()
 
 
 if __name__ == "__main__":

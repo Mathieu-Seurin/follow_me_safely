@@ -24,12 +24,13 @@ class DQNAgent(object):
         if config["feedback_percentage_in_buffer"] == 0: # no proportionnal, use classical replay buffer
             self.memory = ReplayMemory(config["memory_size"])
         else:
-            self.memory = ProportionReplayMemory(proportion=config["feedback_proportion_replayed"],
+            self.memory = ProportionReplayMemory(proportion=config["feedback_percentage_in_buffer"],
                                                  capacity=config["memory_size"])
 
         self.update_every_n_ep = config["update_every_n_ep"]
 
-        self.num_update = 0
+        self.num_update_target = 0
+        self.num_optim_dqn = 0
 
         # ============ LOSSES : Bellman, feedback, regularization ========
         # ================================================================
@@ -135,7 +136,7 @@ class DQNAgent(object):
 
         if epoch % self.update_every_n_ep == 0:
             self.target_net.load_state_dict(self.policy_net.state_dict())
-            self.num_update += 1
+            self.num_update_target += 1
 
     def optimize(self):
         if len(self.memory) < self.batch_size:
@@ -219,10 +220,10 @@ class DQNAgent(object):
         self.optimizer.step()
 
         if self.summary_writer:
-            self.summary_writer.add_scalar("data/feedback_percentage_in_buffer", feedback_batch.mean().item(), self.num_update)
-            self.summary_writer.add_histogram("data/reward_in_batch_replay_buffer", reward_batch.detach().cpu().numpy(), self.num_update, bins=4)
-            #self.summary_writer.add_histogramm("data/q_values", state_values.mean, self.num_update, bins=4)
+            self.summary_writer.add_scalar("data/feedback_percentage_in_buffer", feedback_batch.mean().item(), self.num_optim_dqn)
+            # self.summary_writer.add_histogram("data/reward_in_batch_replay_buffer", reward_batch.detach().cpu().numpy(), self.num_update, bins=4)
+            # self.summary_writer.add_histogramm("data/q_values", state_values.mean, self.num_update, bins=4)
 
-
+        self.num_optim_dqn += 1
 
         #check_params_changed(old_params, self.policy_net.state_dict())

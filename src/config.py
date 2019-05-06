@@ -5,8 +5,8 @@ import itertools as it
 from copy import deepcopy
 from random import shuffle
 
-DEFAULT_CONFIG = {
-    "env_ext" : '',
+EXPE_DEFAULT_CONFIG = {
+    "env_ext" : 'shorter.json',
     "model_ext" : '',
     "seed": 42,
     "exp_dir": "grid_out",
@@ -55,15 +55,9 @@ def load_config(env_config_file, model_config_file, seed,
     env_config = load_single_config(os.path.join("config", "env", env_config_file))
 
     # Override env file if specified
-    # Can be a dict of parameters or a str indicating the path to the extension
     if env_ext_file:
-        if type(env_ext_file) is str:
-            env_ext = load_single_config(os.path.join("config","env_ext",env_ext_file))
-        else:
-            assert type(env_ext_file) is dict, "Not a dict problem, type : {}".format(type(env_ext_file))
-            env_ext = env_ext_file
-
-        env_config = override_config_recurs(env_config, env_ext)
+        env_ext_config = load_single_config(os.path.join("config","env_ext", env_ext_file))
+        env_config = override_config_recurs(env_config, env_ext_config)
 
     if not os.path.exists(out_dir):
         os.mkdir(out_dir)
@@ -87,12 +81,21 @@ def load_config(env_config_file, model_config_file, seed,
     # === Loading MODEL config, extension and check integrity =====
     # ===========================================================
     model_config = load_single_config(os.path.join("config","model",model_config_file))
+
     # Override model file if specified
+    # Can be a dict of parameters or a str indicating the path to the extension
     if model_ext_file:
-        model_ext_config = load_single_config(os.path.join("config","model_ext",model_ext_file))
+        if type(model_ext_file) is str:
+            model_ext_config = load_single_config(os.path.join("config", "model_ext", model_ext_file))
+        else:
+            assert type(model_ext_file) is dict, "Not a dict problem, type : {}".format(type(model_ext_file))
+            model_ext_config = model_ext_file
+
         model_config = override_config_recurs(model_config, model_ext_config)
     else:
         model_ext_config = {"name" : ''}
+
+
 
     # create model_file if necessary
     model_name = model_config["name"]
@@ -127,8 +130,6 @@ def load_config(env_config_file, model_config_file, seed,
 
     if not os.path.exists(path_to_expe):
         os.mkdir(path_to_expe)
-    else:
-        print("Warning, experiment already exists, overriding it.")
 
     return full_config, model_path
 
@@ -139,7 +140,7 @@ def read_multiple_ext_file(config_path):
     all_expe_to_run = []
     for ext in json_config["model_ext"]:
 
-        expe_config = DEFAULT_CONFIG
+        expe_config = EXPE_DEFAULT_CONFIG
         expe_config.update(json_config["common"])
 
         expe_config["model_ext"] = ext
@@ -157,7 +158,7 @@ def read_multiple_config_file(config_path):
 
     for config in json_config:
 
-        expe_config = deepcopy(DEFAULT_CONFIG)
+        expe_config = deepcopy(EXPE_DEFAULT_CONFIG)
         expe_config.update(config)
         all_expe_to_run.append(expe_config)
 
@@ -185,10 +186,11 @@ def create_grid_search_config(grid_path):
         # Join key and value in the name
         expe_ext["name"] = '-'.join([':'.join(map(str,items)) for items in params_dict.items()])
 
-        expe_config = deepcopy(DEFAULT_CONFIG)
+        expe_config = deepcopy(EXPE_DEFAULT_CONFIG)
         expe_config["model_ext"] = expe_ext
         expe_config["model_config"] = grid_config["model_config"]
         expe_config["env_config"] = grid_config["env_config"]
+        expe_config["env_ext"] = grid_config["env_ext"]
 
         all_expe_to_run.append(expe_config)
 

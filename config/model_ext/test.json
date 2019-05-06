@@ -1,0 +1,6 @@
+{
+  "dqn_params" :
+  {
+    "feedback_percentage_in_buffer" : 0.05
+  }
+}

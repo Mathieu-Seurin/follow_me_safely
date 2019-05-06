@@ -41,5 +41,7 @@ if __name__ == "__main__":
         configs.extend(create_grid_search_config(args.grid_search_config))
 
     ray.init(num_gpus=args.n_gpus)
+
     ray.get([train.remote(**config) for config in configs])
-    #ray.get([dummy_train.remote(config) for config in configs])
+    #ray.get([train.remote(**config) for config in configs[10:12]])
+    #ray.get([dummy_train.remote(config) for config in configs[:1]])

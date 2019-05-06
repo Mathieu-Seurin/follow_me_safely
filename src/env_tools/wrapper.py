@@ -121,8 +121,9 @@ class CarFrameStackWrapper(gym.Wrapper):
 
         return frame
 
-    def _unconvert(self, converted_frame):
+    def _unconvert(self, converted_frame, frame=2):
 
+        converted_frame = converted_frame['state'].numpy()[0, frame, :, :]
         #converted_frame = np.squeeze(converted_frame, 0)
         original_frame = color.gray2rgb(converted_frame + 1)/2 #* 255
         return original_frame
@@ -222,6 +223,10 @@ class MinigridFrameStacker(gym.Wrapper):
         observation_space['state'] = gym.spaces.Box(low=0, high=10, shape=(3*n_frameskip, 7, 7))
         self.observation_space = gym.spaces.Dict(observation_space)
 
+    def _unconvert(self, state):
+        x = self.render("rgb_array")
+        return x
+
     def stack_last_frame(self, obs):
         new_obs = np.concatenate((*self.last_frames, obs), axis=2)
         new_obs = new_obs.transpose((2, 0, 1))
@@ -246,7 +251,7 @@ class MinigridFrameStacker(gym.Wrapper):
 
     def step(self, action):
 
-        obs, reward, done, info  = super().step(action)
+        obs, reward, done, info = super().step(action)
 
         self.last_frames = [obs['state'] for i in range(self.n_frameskip - 1)]
 
@@ -337,7 +342,7 @@ if __name__ == "__main__" :
             assert obs['state'].shape == (3*n_frameskip, 7, 7)
             step += 1
 
-            if obs['gave_feedback'] :
+            if obs['gave_feedback']:
                 time.sleep(2)
                 print(rew, done, step)
 
