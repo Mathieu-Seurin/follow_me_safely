@@ -9,7 +9,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.use('agg')
 
-from rl_agent.agent_utils import save_images_q_values
+from rl_agent.agent_utils import render_state_and_q_values
 
 from config import load_config
 from rl_agent.dqn_agent import DQNAgent
@@ -79,6 +79,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
 
     writer = tensorboardX.SummaryWriter(expe_path)
 
+    MAX_STATE_TO_REMEMBER = 50 # To avoid storing too much images in tensorboard
     DEFAULT_LOG_STATS = 3
     log_stats_every = full_config.get("log_stats_every", DEFAULT_LOG_STATS)
 
@@ -155,6 +156,14 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
             percentage_tile_seen = 0
             n_feedback_this_ep = 0
 
+            rendered_images = []
+
+            # Do we store images of state and q function associated with it ?
+            if num_episode in save_images_at or num_episode == episodes - 1:
+                save_images_and_q_this_ep = True
+            else:
+                save_images_and_q_this_ep = False
+
             while not done:
 
                 action = model.select_action(state['state'])
@@ -168,13 +177,14 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
                 if not local_test:
                     model.optimize()
 
-                # Save images of state and q func associated
-                if num_episode in save_images_at or num_episode == episodes - 1:
+                # Render state, and compute q values to visualize them later
+                if save_images_and_q_this_ep:
+                    array_rendered = render_state_and_q_values(model=model, game=game, state=state)
+                    rendered_images.append(array_rendered)
 
-                    if iter_this_ep < 20:
-                        save_images_q_values(model=model, game=game,
-                                             state=state, writer=writer,
-                                             num_episode=num_episode, iter_this_ep=iter_this_ep)
+                    # Save only the last frames, to avoid overloading tensorboard
+                    if len(rendered_images) > MAX_STATE_TO_REMEMBER:
+                        rendered_images.pop(0)
 
                 state = next_state
 
@@ -194,6 +204,15 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
 
             # DONE, GO HERE :
             # ================
+
+            # Save images of state and q func associated
+            if save_images_and_q_this_ep:
+                for i, array_rendered in enumerate(rendered_images):
+                    num_iter = iter_this_ep - len(rendered_images) + i + 1
+                    writer.add_image('data/{}/state_and_q'.format(num_episode), global_step=num_iter,
+                                     img_tensor=array_rendered, dataformats="HWC")
+
+            # Update target network if needed
             model.callback(epoch=num_episode)
 
             reward_undiscount_list.append(reward_total_not_discounted.item())

@@ -222,7 +222,7 @@ def feedback_bad_to_min(qs, action, feedback, margin, regression_loss):
     return loss
 
 
-def save_images_q_values(model, game, state, writer, num_episode, iter_this_ep):
+def render_state_and_q_values(model, game, state):
 
     q = model.get_q_values(state['state'])
     max_action = torch.max(q, dim=1)[1].item()
@@ -252,13 +252,10 @@ def save_images_q_values(model, game, state, writer, num_episode, iter_this_ep):
     array_rendered = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep='')
     array_rendered = array_rendered.reshape(fig.canvas.get_width_height()[::-1] + (3,))
 
+    plt.close()
     # X = np.array(fig.canvas)
 
-    writer.add_image('data/{}/state_and_q'.format(num_episode), global_step=iter_this_ep, img_tensor=array_rendered,
-                     dataformats="HWC")
-    # plt.show()
-    plt.close()
-
+    return array_rendered
 
 if __name__ == "__main__":
 
