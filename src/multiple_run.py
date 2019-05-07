@@ -42,6 +42,6 @@ if __name__ == "__main__":
 
     ray.init(num_gpus=args.n_gpus)
 
-    ray.get([train.remote(**config) for config in configs])
+    ray.get([train.remote(**config, override_expe=False) for config in configs])
     #ray.get([train.remote(**config) for config in configs[10:12]])
     #ray.get([dummy_train.remote(config) for config in configs[:1]])

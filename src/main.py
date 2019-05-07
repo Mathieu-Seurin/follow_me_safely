@@ -15,6 +15,8 @@ from config import load_config
 from rl_agent.dqn_agent import DQNAgent
 
 import tensorboardX
+
+import tensorflow as tf
 import numpy as np
 import torch
 
@@ -26,7 +28,7 @@ import ray
 from env_tools.car_racing import CarRacingSafe
 
 @ray.remote(num_gpus=0.24)
-def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_test):
+def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_test, override_expe=True):
 
     print("Expe",env_config, env_ext, model_config, model_ext, exp_dir, seed, sep='  ')
     print("Is cuda available ?", torch.cuda.is_available())
@@ -46,19 +48,33 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
                               seed=seed
                               )
 
+    if override_expe == False:
+        # Check that the experiment has run more than a few episodes
+        # If so, DON'T rerun everything (useful for grid search)
 
-    MIN_SIZE_IN_MB = 20
-    for dir in os.listdir(expe_path):
-        if "tfevents" in dir:
-            tf_event_path = os.path.join(expe_path,dir)
+        rerun_expe = True
 
-            f_stats = os.stat(tf_event_path)
-            if f_stats.st_size / 1e6 > MIN_SIZE_IN_MB:
-                print("Experiment already done, don't override")
-                return False
-            else:
-                os.remove(tf_event_path)
-                print("Experiment doesn't seem to be over, rerun.")
+        for dir in os.listdir(expe_path):
+
+            last_ep = 0
+
+            if "tfevents" in dir:
+                tf_event_path = os.path.join(expe_path,dir)
+
+                for i, elem in enumerate(tf.train.summary_iterator(tf_event_path)):
+                    for v in elem.summary.value:
+                        if 'episode' in v.tag:
+                            last_ep = max(int(v.simple_value), last_ep)
+
+                if last_ep < 10:
+                    os.remove(tf_event_path)
+                    print("Experiment doesn't seem to be over, rerun.")
+                else:
+                    rerun_expe = False
+
+        if rerun_expe == False:
+            print("Expe was over, don't rerun")
+            return False
 
 
     writer = tensorboardX.SummaryWriter(expe_path)
@@ -155,7 +171,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
                 # Save images of state and q func associated
                 if num_episode in save_images_at or num_episode == episodes - 1:
 
-                    if iter_this_ep % 4 == 0:
+                    if iter_this_ep < 20:
                         save_images_q_values(model=model, game=game,
                                              state=state, writer=writer,
                                              num_episode=num_episode, iter_this_ep=iter_this_ep)
@@ -259,5 +275,13 @@ if __name__ == "__main__":
     ext_test = {"dqn_params" : {"feedback_proportion_replayed" : 0.05}}
 
     ray.init(num_gpus=1, local_mode=True)
-    ray.get(train.remote(args.env_config, args.env_ext, args.model_config, args.model_ext, args.exp_dir, args.seed, args.local_test))
+    ray.get(train.remote(args.env_config,
+                         args.env_ext,
+                         args.model_config,
+                         args.model_ext,
+                         args.exp_dir,
+                         args.seed,
+                         args.local_test,
+                         override_expe=True))
+
     #ray.get(train.remote(args.env_config, args.env_ext, args.model_config, ext_test, args.exp_dir, args.seed, args.local_test))
