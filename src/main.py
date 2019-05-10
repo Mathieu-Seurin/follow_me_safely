@@ -1,37 +1,39 @@
-import argparse
-
-import gym.wrappers
-from env_tools.wrapper import CarFrameStackWrapper, CarActionWrapper, MinigridFrameStacker
-
-from gym_minigrid.envs.safe_crossing import SafeCrossing
-
+import ray
+import os
 import matplotlib
 import matplotlib.pyplot as plt
+
 matplotlib.use('agg')
-
-from rl_agent.agent_utils import render_state_and_q_values
-
-from config import load_config
-from rl_agent.dqn_agent import DQNAgent
 
 import tensorboardX
 
 import tensorflow as tf
 import numpy as np
-import torch
 
-import os
-import time
-
-import ray
-
-from env_tools.car_racing import CarRacingSafe
-
-@ray.remote(num_gpus=0.24)
+@ray.remote(num_gpus=0.19)
 def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_test, override_expe=True):
+    import argparse
+
+    import gym.wrappers
+    from env_tools.wrapper import CarFrameStackWrapper, CarActionWrapper, MinigridFrameStacker
+
+    from gym_minigrid.envs.safe_crossing import SafeCrossing
+
+    from rl_agent.agent_utils import render_state_and_q_values
+
+    from config import load_config
+    from rl_agent.dqn_agent import DQNAgent
+
+    import torch
+
+    from env_tools.car_racing import CarRacingSafe
 
     print("Expe",env_config, env_ext, model_config, model_ext, exp_dir, seed, sep='  ')
     print("Is cuda available ?", torch.cuda.is_available())
+
+    assert len(ray.get_gpu_ids()) == 1
+
+    assert torch.cuda.device_count() == 1, "Should be only 1, is {}".format(torch.cuda.device_count())
 
     if local_test:
         display = open('nothing.txt', 'w')
@@ -66,7 +68,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
                         if 'episode' in v.tag:
                             last_ep = max(int(v.simple_value), last_ep)
 
-                if last_ep < 10:
+                if last_ep < 20:
                     os.remove(tf_event_path)
                     print("Experiment doesn't seem to be over, rerun.")
                 else:
@@ -291,16 +293,20 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    ext_test = {"dqn_params" : {"feedback_proportion_replayed" : 0.05}}
-
     ray.init(num_gpus=1, local_mode=True)
-    ray.get(train.remote(args.env_config,
-                         args.env_ext,
-                         args.model_config,
-                         args.model_ext,
-                         args.exp_dir,
-                         args.seed,
-                         args.local_test,
-                         override_expe=True))
+    # ray.get(train.remote(args.env_config,
+    #                      args.env_ext,
+    #                      args.model_config,
+    #                      args.model_ext,
+    #                      args.exp_dir,
+    #                      args.seed,
+    #                      args.local_test,
+    #                      override_expe=True))
 
-    #ray.get(train.remote(args.env_config, args.env_ext, args.model_config, ext_test, args.exp_dir, args.seed, args.local_test))
+    ext_test = {'dqn_params': {'feedback_percentage_in_buffer': 0.1, 'learning_rate': 0.001, 'consistency_loss_weight': 1,
+                               'classification_margin': 0.01, 'classification_loss_weight': 0, 'classification_max_loss_weight': 0.7
+                               },
+                'name': 'feedback_percentage_in_buffer:0.1-learning_rate:0.001-consistency_loss_weight:1-classification_margin:0.01-classification_loss_weight:0-classification_max_loss_weight:0.7'
+                }
+
+    ray.get(train.remote(args.env_config, args.env_ext, args.model_config, ext_test, args.exp_dir, args.seed, args.local_test))

@@ -14,6 +14,8 @@ class DQNAgent(object):
 
     def __init__(self, config, n_action, state_dim, discount_factor, writer=None):
 
+        self.save_config = config
+
         self.discount_factor = discount_factor
         self.n_action = n_action.n
 
@@ -43,9 +45,6 @@ class DQNAgent(object):
             self.feedback_loss = feedback_bad_to_min_when_max
             self.classification_loss_weight = config["classification_loss_weight"]
 
-
-        self.use_feedback_loss
-
         # Temporal Consistency loss : see https://arxiv.org/pdf/1805.11593.pdf
         # To avoid over generalization
         self.use_consistency_loss_dfqd = config["consistency_loss_weight"] > 0
@@ -58,7 +57,12 @@ class DQNAgent(object):
 
         Model = FullyConnectedModel if config["model_type"] == "fc" else ConvModel
 
-        self.policy_net = Model(config["model_params"], n_action=n_action, state_dim=state_dim).to(TORCH_DEVICE)
+        try:
+            self.policy_net = Model(config["model_params"], n_action=n_action, state_dim=state_dim).to(TORCH_DEVICE)
+        except RuntimeError as e:
+            print(self.save_config)
+            raise e
+
         self.target_net = Model(config["model_params"], n_action=n_action, state_dim=state_dim).to(TORCH_DEVICE)
         self.target_net.load_state_dict(self.policy_net.state_dict())
 
@@ -172,10 +176,22 @@ class DQNAgent(object):
         # on the "older" target_net; selecting their best reward with max(1)[0].
         # This is merged based on the mask, such that we'll have either the expected
         # state value or 0 in case the state was final.
-        next_state_values = torch.zeros(self.batch_size, device=TORCH_DEVICE)
+        next_state_action_values = self.target_net(non_final_next_states)
+        next_state_action_values = next_state_action_values.detach()
 
-        next_state_action_values = self.target_net(non_final_next_states).detach()
-        next_state_values[non_final_mask] = next_state_action_values.max(1)[0]
+        next_state_values = torch.zeros(self.batch_size, device=TORCH_DEVICE)
+        try:
+            next_state_values[non_final_mask] = next_state_action_values.max(1)[0]
+        except RuntimeError as e:
+            print(self.save_config)
+
+            print("Next state values shape", next_state_values.shape)
+            print("Next state action values shape", next_state_action_values.shape)
+            print("Next state action values max", next_state_action_values.max(1)[0])
+
+            raise e
+
+
         # Compute the expected Q values
         expected_state_action_values = (next_state_values * self.discount_factor) + reward_batch
 

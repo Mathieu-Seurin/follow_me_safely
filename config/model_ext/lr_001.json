@@ -1,0 +1,6 @@
+{
+    "name": "lr0.001",
+    "dqn_params": {
+      "learning_rate": 1e-3
+    }
+}

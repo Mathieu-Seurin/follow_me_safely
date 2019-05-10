@@ -1,5 +1,5 @@
 {
-  "name": "dqn_conv_grid_update_4_gamma99",
+  "name": "dqn_conv_grid_update_4_baseline",
 
   "agent_type" : "dqn",
   "discount_factor": 0.99,
@@ -39,7 +39,7 @@
 
     "biased_sampling" : false,
 
-    "update_every_n_ep" : 100,
+    "update_every_n_ep" : 40,
 
     "consistency_loss_weight" : 0,
 

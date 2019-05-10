@@ -1,0 +1,26 @@
+{
+  "model_config" : "cnn_grid.json",
+  "env_config" : "safe_minigrid_7.json",
+
+  "dqn_params": {
+
+    "feedback_percentage_in_buffer" : [0, 0.05],
+
+    "update_every_n_ep" : [20, 40],
+
+    "consistency_loss_weight" : [0, 0.5, 1],
+
+    "classification_margin" : [0, 0.01, 0.1, 0.8],
+
+    "classification_loss_weight" : [0, 0.2, 0.7, 1],
+    "classification_max_loss_weight" : [0, 0.2, 0.7, 1]
+
+  },
+
+  "only_one_required" : [
+    [
+      "classification_max_loss_weight",
+      "classification_loss_weight"
+    ]
+  ]
+}

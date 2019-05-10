@@ -1,0 +1,41 @@
+[
+  {
+    "model_config": "cnn_basic.json",
+    "env_config": "car_racing_safe.json",
+    "env_ext" : "shorter.json"
+  },
+
+  {
+    "model_config": "cnn_basic.json",
+    "env_config": "car_racing_safe_big_punish.json",
+    "env_ext" : "shorter.json"
+  },
+
+  {
+    "model_config": "cnn_basic.json",
+    "env_config": "car_racing_safe_bigbig_punish.json",
+    "env_ext" : "shorter.json"
+  },
+
+  {
+    "model_config": "cnn_basic.json",
+    "env_config": "car_racing_safe.json",
+    "env_ext" : "shorter.json",
+    "model_ext" : "lr_001.json"
+  },
+
+  {
+    "model_config": "cnn_basic.json",
+    "env_config": "car_racing_safe_big_punish.json",
+    "env_ext" : "shorter.json",
+    "model_ext" : "lr_001.json"
+  },
+
+  {
+    "model_config": "cnn_basic.json",
+    "env_config": "car_racing_safe_bigbig_punish.json",
+    "env_ext" : "shorter.json",
+    "model_ext" : "lr_001.json"
+  }
+
+]
