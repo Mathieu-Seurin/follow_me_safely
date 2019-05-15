@@ -1,0 +1,15 @@
+{
+  "model_config" : "cnn_basic.json",
+  "env_config" : "car_racing_safe.json",
+  "env_ext" : "shorter.json",
+
+  "dqn_params": {
+
+    "feedback_percentage_in_buffer" : [0, 0.05],
+    "learning_rate": [5e-4, 1e-3],
+    "classification_margin" : [0, 0.01, 0.1, 0.8],
+    "classification_max_loss_weight" : [0.2, 0.7, 1]
+
+  }
+
+}

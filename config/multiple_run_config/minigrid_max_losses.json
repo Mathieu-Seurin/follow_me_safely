@@ -1,0 +1,12 @@
+{
+  "model_config" : "cnn_grid.json",
+  "env_config" : "safe_minigrid_7.json",
+
+  "dqn_params": {
+
+    "learning_rate": [5e-4, 1e-3, 3e-3],
+    "update_every_n_ep" : [20,40,60],
+    "classification_margin" : [0, 0.01, 0.1, 0.8],
+    "classification_max_loss_weight" : [0.2, 0.7, 0.6, 0.8, 0.9, 1]
+  }
+}

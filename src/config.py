@@ -3,13 +3,13 @@ import os
 import itertools as it
 
 from copy import deepcopy
-from random import shuffle
+from random import shuffle, randint
 
 EXPE_DEFAULT_CONFIG = {
-    "env_ext" : 'shorter.json',
+    "env_ext" : '',
     "model_ext" : '',
     "seed": 42,
-    "exp_dir": "grid_out",
+    "exp_dir": "osef",
     "local_test": False}
 
 def override_config_recurs(config, config_extension):
@@ -131,7 +131,7 @@ def load_config(env_config_file, model_config_file, seed,
     if not os.path.exists(path_to_expe):
         os.mkdir(path_to_expe)
 
-    return full_config, model_path
+    return full_config, path_to_expe
 
 def read_multiple_ext_file(config_path):
 
@@ -190,34 +190,49 @@ def create_grid_search_config(grid_path):
         expe_config["model_ext"] = expe_ext
         expe_config["model_config"] = grid_config["model_config"]
         expe_config["env_config"] = grid_config["env_config"]
-        expe_config["env_ext"] = grid_config["env_ext"]
+
+        expe_config["exp_dir"] = grid_config.get("exp_dir", expe_config["exp_dir"])
+        expe_config["env_ext"] = grid_config.get("env_ext", expe_config["env_ext"])
 
         all_expe_to_run.append(expe_config)
 
 
-    expe_to_filter = []
+    only_one_required = grid_config.get("only_one_required", False)
 
-    # Filter list : delete expe who doesn't have at least one condition specified
-    only_one_required = grid_config["only_one_required"]
-    for num_expe, expe in enumerate(all_expe_to_run):
-        for condition in only_one_required:
-            value1 = expe["model_ext"]["dqn_params"][condition[0]]
-            value2 = expe["model_ext"]["dqn_params"][condition[1]]
+    if only_one_required:
 
-            # if both are 0 reject, if both are positive => reject
-            if bool(value1) == bool(value2) :
-                expe_to_filter.append(num_expe)
+        expe_to_filter = []
 
-    # other filter ?
+        # Filter list : delete expe who doesn't have at least one condition specified
+        for num_expe, expe in enumerate(all_expe_to_run):
+            for condition in only_one_required:
+                value1 = expe["model_ext"]["dqn_params"][condition[0]]
+                value2 = expe["model_ext"]["dqn_params"][condition[1]]
 
-    # Delete expe that are in the filter
-    for num_expe in reversed(expe_to_filter):
-        all_expe_to_run.pop(num_expe)
+                # if both are 0 reject, if both are positive => reject
+                if bool(value1) == bool(value2) :
+                    expe_to_filter.append(num_expe)
+
+        # Delete expe that are in the filter
+        for num_expe in reversed(expe_to_filter):
+            all_expe_to_run.pop(num_expe)
 
     # Grid search become random search, yea.
     shuffle(all_expe_to_run)
 
     return all_expe_to_run
+
+
+def extend_multiple_seed(all_expe_to_run, number_of_seed=2):
+
+    extended_expe_list = []
+    for expe in all_expe_to_run:
+        for n_seed in range(number_of_seed):
+            new_expe = deepcopy(expe)
+            new_expe["seed"] = randint(0, 1e7)
+            extended_expe_list.append(new_expe)
+
+    return extended_expe_list
 
 
 # =====================

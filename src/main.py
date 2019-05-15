@@ -10,8 +10,10 @@ import tensorboardX
 import tensorflow as tf
 import numpy as np
 
-@ray.remote(num_gpus=0.19)
-def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_test, override_expe=True):
+import time
+
+@ray.remote(num_gpus=0.24)
+def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_test, override_expe=True, save_images=False):
     import argparse
 
     import gym.wrappers
@@ -82,7 +84,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
     writer = tensorboardX.SummaryWriter(expe_path)
 
     MAX_STATE_TO_REMEMBER = 50 # To avoid storing too much images in tensorboard
-    DEFAULT_LOG_STATS = 3
+    DEFAULT_LOG_STATS = 5
     log_stats_every = full_config.get("log_stats_every", DEFAULT_LOG_STATS)
 
     if "racing" in full_config["env_name"].lower():
@@ -161,7 +163,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
             rendered_images = []
 
             # Do we store images of state and q function associated with it ?
-            if num_episode in save_images_at or num_episode == episodes - 1:
+            if save_images and (num_episode in save_images_at or num_episode == episodes - 1):
                 save_images_and_q_this_ep = True
             else:
                 save_images_and_q_this_ep = False
@@ -248,11 +250,11 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
                 writer.add_scalar("data/reward_discounted", last_rewards_discount, total_iter)
                 writer.add_scalar("data/reward_not_discounted", last_rewards_undiscount, total_iter)
 
-                writer.add_scalar("data/running_mean_reward_discounted", reward_discount_mean, total_iter)
-                writer.add_scalar("data/running_mean_reward_not_discounted", reward_undiscount_mean, total_iter)
+                #writer.add_scalar("data/running_mean_reward_discounted", reward_discount_mean, total_iter)
+                #writer.add_scalar("data/running_mean_reward_not_discounted", reward_undiscount_mean, total_iter)
                 writer.add_scalar("data/iter_per_ep", iter_this_ep_mean, total_iter)
-                writer.add_scalar("data/epsilon", model.current_eps, total_iter)
-                writer.add_scalar("data/model_update", model.num_update_target, total_iter)
+                #writer.add_scalar("data/epsilon", model.current_eps, total_iter)
+                #writer.add_scalar("data/model_update", model.num_update_target, total_iter)
                 writer.add_scalar("data/n_episode", num_episode, total_iter)
                 # writer.add_scalar("data/model_update_ep", model.num_update_target, num_episode)
 
@@ -278,8 +280,17 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
 
         print("Experiment over")
 
+    # Enforce cleaning
+    del model.memory
+    del model
+    del game
+    torch.cuda.empty_cache()
+    return True
+
 
 if __name__ == "__main__":
+
+    import argparse
 
     parser = argparse.ArgumentParser('Log Parser arguments!')
 
@@ -294,19 +305,21 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     ray.init(num_gpus=1, local_mode=True)
-    # ray.get(train.remote(args.env_config,
-    #                      args.env_ext,
-    #                      args.model_config,
-    #                      args.model_ext,
-    #                      args.exp_dir,
-    #                      args.seed,
-    #                      args.local_test,
-    #                      override_expe=True))
+    a = ray.get(train.remote(args.env_config,
+                         args.env_ext,
+                         args.model_config,
+                         args.model_ext,
+                         args.exp_dir,
+                         args.seed,
+                         args.local_test,
+                         override_expe=False))
 
-    ext_test = {'dqn_params': {'feedback_percentage_in_buffer': 0.1, 'learning_rate': 0.001, 'consistency_loss_weight': 1,
-                               'classification_margin': 0.01, 'classification_loss_weight': 0, 'classification_max_loss_weight': 0.7
-                               },
-                'name': 'feedback_percentage_in_buffer:0.1-learning_rate:0.001-consistency_loss_weight:1-classification_margin:0.01-classification_loss_weight:0-classification_max_loss_weight:0.7'
-                }
+    print(a)
 
-    ray.get(train.remote(args.env_config, args.env_ext, args.model_config, ext_test, args.exp_dir, args.seed, args.local_test))
+    # ext_test = {'dqn_params': {'feedback_percentage_in_buffer': 0.1, 'learning_rate': 0.001, 'consistency_loss_weight': 1,
+    #                            'classification_margin': 0.01, 'classification_loss_weight': 0, 'classification_max_loss_weight': 0.7
+    #                            },
+    #             'name': 'feedback_percentage_in_buffer:0.1-learning_rate:0.001-consistency_loss_weight:1-classification_margin:0.01-classification_loss_weight:0-classification_max_loss_weight:0.7'
+    #             }
+    #
+    # ray.get(train.remote(args.env_config, args.env_ext, args.model_config, ext_test, args.exp_dir, args.seed, args.local_test))

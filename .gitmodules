@@ -1,3 +1,6 @@
 [submodule "src/gym-minigrid"]
 	path = src/gym-minigrid
 	url = https://github.com/Mathieu-Seurin/gym-minigrid.git
+[submodule "src/tensorboard-aggregator"]
+	path = src/tensorboard-aggregator
+	url = https://github.com/Mathieu-Seurin/tensorboard-aggregator.git

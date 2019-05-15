@@ -1,0 +1,16 @@
+{
+  "name": "Minigrid-safe-size5_quick",
+
+  "reward_when_out" : 0,
+  "size_env" : 5,
+
+  "log_stats_every" : 1,
+
+  "n_frameskip" : 3,
+
+  "stop" : {
+    "episode_reward_mean" : 0.95,
+    "episodes_total" : 5
+  }
+}
+
