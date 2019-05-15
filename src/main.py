@@ -33,7 +33,8 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
     print("Expe",env_config, env_ext, model_config, model_ext, exp_dir, seed, sep='  ')
     print("Is cuda available ?", torch.cuda.is_available())
 
-    assert len(ray.get_gpu_ids()) == 1
+    if not local_test:
+        assert len(ray.get_gpu_ids()) == 1
 
     assert torch.cuda.device_count() == 1, "Should be only 1, is {}".format(torch.cuda.device_count())
 
@@ -84,7 +85,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
     writer = tensorboardX.SummaryWriter(expe_path)
 
     MAX_STATE_TO_REMEMBER = 50 # To avoid storing too much images in tensorboard
-    DEFAULT_LOG_STATS = 5
+    DEFAULT_LOG_STATS = 10
     log_stats_every = full_config.get("log_stats_every", DEFAULT_LOG_STATS)
 
     if "racing" in full_config["env_name"].lower():
@@ -113,7 +114,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
     else:
         game = gym.make(full_config["env_name"])
 
-    episodes = full_config["stop"]["episodes_total"]
+    max_iter_expe = full_config["stop"]["max_iter_expe"]
     score_success = full_config["stop"]["episode_reward_mean"]
 
     discount_factor = full_config["discount_factor"]
@@ -127,7 +128,11 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
     reward_discount_list = []
     feedback_per_ep_list = []
     percentage_tile_seen_list = []
+
     iter_this_ep_list = []
+    last_reward_undiscount_list = []
+    last_reward_discount_list = []
+
 
     best_undiscount_reward = -float("inf")
 
@@ -137,7 +142,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
                          n_action=game.action_space,
                          state_dim=game.observation_space,
                          discount_factor=discount_factor,
-                         writer=writer
+                         writer=None
                          )
     else:
         raise NotImplementedError("{} not available for model".format(full_config["agent_type"]))
@@ -146,7 +151,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
 
     with display as xvfb:
 
-        while num_episode < episodes and not early_stopping :
+        while total_iter < max_iter_expe and not early_stopping :
 
             state = game.reset()
             state['state'] = torch.FloatTensor(state['state']).unsqueeze(0)
@@ -163,7 +168,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
             rendered_images = []
 
             # Do we store images of state and q function associated with it ?
-            if save_images and (num_episode in save_images_at or num_episode == episodes - 1):
+            if save_images and (num_episode in save_images_at):
                 save_images_and_q_this_ep = True
             else:
                 save_images_and_q_this_ep = False
@@ -203,8 +208,47 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
                 reward_total_discounted += reward * (discount_factor ** iter_this_ep)
                 reward_total_not_discounted += reward
 
-                # print("step",total_iter)
-                # print(time.time() - timer)
+
+                #=======================
+                # LOG STATS HERE
+                if total_iter % log_stats_every == 0:
+                    reward_discount_mean = np.mean(reward_discount_list)
+                    reward_undiscount_mean = np.mean(reward_undiscount_list)
+
+                    last_rewards_discount = np.mean(last_reward_undiscount_list)
+                    last_rewards_undiscount = np.mean(last_reward_discount_list)
+
+                    iter_this_ep_mean = np.mean(iter_this_ep_list)
+
+                    last_feedback_mean = np.mean(feedback_per_ep_list)
+
+                    writer.add_scalar("data/percentage_tile_seen", np.mean(percentage_tile_seen_list), total_iter)
+                    writer.add_scalar("data/number_of feedback", last_feedback_mean, total_iter)
+
+                    writer.add_scalar("data/reward_discounted", last_rewards_discount, total_iter)
+                    writer.add_scalar("data/reward_not_discounted", last_rewards_undiscount, total_iter)
+
+                    writer.add_scalar("data/running_mean_reward_discounted", reward_discount_mean, total_iter)
+                    writer.add_scalar("data/running_mean_reward_not_discounted", reward_undiscount_mean, total_iter)
+                    writer.add_scalar("data/iter_per_ep", iter_this_ep_mean, total_iter)
+                    # writer.add_scalar("data/epsilon", model.current_eps, total_iter)
+                    # writer.add_scalar("data/model_update", model.num_update_target, total_iter)
+                    writer.add_scalar("data/n_episode_since_last_log", len(last_reward_discount_list), total_iter)
+                    # writer.add_scalar("data/model_update_ep", model.num_update_target, num_episode)
+
+                    if last_rewards_undiscount > best_undiscount_reward:
+                        best_undiscount_reward = reward_discount_mean
+                        torch.save(model.policy_net.state_dict(), os.path.join(expe_path, "best_model.pth"))
+
+                    torch.save(model.policy_net.state_dict(), os.path.join(expe_path, "last_model.pth"))
+
+                    # Reset feedback and percentage
+                    feedback_per_ep_list = []
+                    percentage_tile_seen_list = []
+                    last_reward_undiscount_list = []
+                    last_reward_discount_list = []
+                    iter_this_ep_list = []
+
 
             # DONE, GO HERE :
             # ================
@@ -222,9 +266,18 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
             reward_undiscount_list.append(reward_total_not_discounted.item())
             reward_discount_list.append(reward_total_discounted.item())
 
+            last_reward_undiscount_list.append(reward_total_not_discounted.item())
+            last_reward_discount_list.append(reward_total_discounted.item())
+
             feedback_per_ep_list.append(n_feedback_this_ep)
             percentage_tile_seen_list.append(percentage_tile_seen)
             iter_this_ep_list.append(iter_this_ep)
+
+            print("End of ep #{}, n_timesteps (estim) {}, iter_this_ep : {}, current_eps {}".format(
+                num_episode, total_iter, np.mean(iter_this_ep_list[-3:]), model.current_eps))
+
+            print("(Estim) Discounted rew : {} undiscounted : {}, n_feedback {} \n\n".format(
+                np.mean(last_reward_discount_list[-3:]), np.mean(last_reward_undiscount_list[-3:]), np.mean(feedback_per_ep_list[-3:])))
 
             if reward_total_discounted > score_success:
                 success_count += 1
@@ -232,49 +285,6 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
                     early_stopping = True
             else:
                 success_count = 0
-
-            if num_episode % log_stats_every == 0 or early_stopping:
-                reward_discount_mean = np.mean(reward_discount_list)
-                reward_undiscount_mean = np.mean(reward_undiscount_list)
-
-                last_rewards_discount = np.mean(reward_discount_list[-log_stats_every:])
-                last_rewards_undiscount = np.mean(reward_undiscount_list[-log_stats_every:])
-
-                iter_this_ep_mean = np.mean(iter_this_ep_list)
-
-                last_feedback_mean = np.mean(feedback_per_ep_list)
-
-                writer.add_scalar("data/percentage_tile_seen", np.mean(percentage_tile_seen_list), total_iter)
-                writer.add_scalar("data/number_of feedback", last_feedback_mean, total_iter)
-
-                writer.add_scalar("data/reward_discounted", last_rewards_discount, total_iter)
-                writer.add_scalar("data/reward_not_discounted", last_rewards_undiscount, total_iter)
-
-                #writer.add_scalar("data/running_mean_reward_discounted", reward_discount_mean, total_iter)
-                #writer.add_scalar("data/running_mean_reward_not_discounted", reward_undiscount_mean, total_iter)
-                writer.add_scalar("data/iter_per_ep", iter_this_ep_mean, total_iter)
-                #writer.add_scalar("data/epsilon", model.current_eps, total_iter)
-                #writer.add_scalar("data/model_update", model.num_update_target, total_iter)
-                writer.add_scalar("data/n_episode", num_episode, total_iter)
-                # writer.add_scalar("data/model_update_ep", model.num_update_target, num_episode)
-
-                print(
-                    "End of ep #{}, n_timesteps {}, iter_this_ep : {}, current_eps {}".format(
-                        num_episode, total_iter, iter_this_ep_mean, model.current_eps))
-
-                print("Discounted rew : {} undiscounted : {}, n_feedback {} \n\n".format(
-                    last_rewards_discount, last_rewards_undiscount, last_feedback_mean))
-
-                if reward_discount_mean > best_undiscount_reward :
-                    best_undiscount_reward = reward_discount_mean
-                    torch.save(model.policy_net.state_dict(), os.path.join(expe_path,"best_model.pth"))
-
-                torch.save(model.policy_net.state_dict(), os.path.join(expe_path, "last_model.pth"))
-
-                # Reset feedback and percentage
-                feedback_per_ep_list = []
-                percentage_tile_seen_list = []
-                iter_this_ep_list = []
 
             num_episode += 1
 
@@ -304,7 +314,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    ray.init(num_gpus=1, local_mode=True)
+    ray.init(num_gpus=1, local_mode=args.local_test)
     a = ray.get(train.remote(args.env_config,
                          args.env_ext,
                          args.model_config,

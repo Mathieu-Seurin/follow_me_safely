@@ -57,12 +57,7 @@ class DQNAgent(object):
 
         Model = FullyConnectedModel if config["model_type"] == "fc" else ConvModel
 
-        try:
-            self.policy_net = Model(config["model_params"], n_action=n_action, state_dim=state_dim).to(TORCH_DEVICE)
-        except RuntimeError as e:
-            print(self.save_config)
-            raise e
-
+        self.policy_net = Model(config["model_params"], n_action=n_action, state_dim=state_dim).to(TORCH_DEVICE)
         self.target_net = Model(config["model_params"], n_action=n_action, state_dim=state_dim).to(TORCH_DEVICE)
         self.target_net.load_state_dict(self.policy_net.state_dict())
 
@@ -180,17 +175,7 @@ class DQNAgent(object):
         next_state_action_values = next_state_action_values.detach()
 
         next_state_values = torch.zeros(self.batch_size, device=TORCH_DEVICE)
-        try:
-            next_state_values[non_final_mask] = next_state_action_values.max(1)[0]
-        except RuntimeError as e:
-            print(self.save_config)
-
-            print("Next state values shape", next_state_values.shape)
-            print("Next state action values shape", next_state_action_values.shape)
-            print("Next state action values max", next_state_action_values.max(1)[0])
-
-            raise e
-
+        next_state_values[non_final_mask] = next_state_action_values.max(1)[0]
 
         # Compute the expected Q values
         expected_state_action_values = (next_state_values * self.discount_factor) + reward_batch

@@ -4,13 +4,13 @@
   "reward_when_out" : 0,
   "size_env" : 5,
 
-  "log_stats_every" : 1,
+  "log_stats_every" : 400,
 
   "n_frameskip" : 3,
 
   "stop" : {
     "episode_reward_mean" : 0.95,
-    "episodes_total" : 5
+    "max_iter_expe" : 2000
   }
 }
 
