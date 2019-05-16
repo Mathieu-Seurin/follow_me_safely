@@ -183,8 +183,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
                 next_state['gave_feedback'] = torch.FloatTensor([next_state['gave_feedback']])
 
                 model.push(state['state'].to('cpu'), action, next_state['state'], reward, next_state['gave_feedback'])
-                if not local_test:
-                    model.optimize()
+                model.optimize()
 
                 # Render state, and compute q values to visualize them later
                 if save_images_and_q_this_ep:

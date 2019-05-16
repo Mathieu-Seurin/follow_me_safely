@@ -175,7 +175,15 @@ class DQNAgent(object):
         next_state_action_values = next_state_action_values.detach()
 
         next_state_values = torch.zeros(self.batch_size, device=TORCH_DEVICE)
-        next_state_values[non_final_mask] = next_state_action_values.max(1)[0]
+
+        # Double Q-learning : the action is selected by the policy_net not the target
+        action_selected_by_policy = self.policy_net(non_final_next_states).detach()
+        action_selected_by_policy = action_selected_by_policy.max(1)[1]
+
+        next_state_values[non_final_mask] = next_state_action_values.gather(1, action_selected_by_policy.unsqueeze(1))
+
+        # Q learning : argmax selected on target
+        #next_state_values[non_final_mask] = next_state_action_values.max(1)[0]
 
         # Compute the expected Q values
         expected_state_action_values = (next_state_values * self.discount_factor) + reward_batch
