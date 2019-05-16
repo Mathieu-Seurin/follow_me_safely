@@ -17,6 +17,56 @@
   {
     "model_config": "cnn_grid.json",
     "env_config": "safe_minigrid_7_punish10.json"
+  },
+
+  {
+    "model_config": "cnn_grid.json",
+    "model_ext" : "target_up20.json",
+    "env_config": "safe_minigrid_7_punish.json"
+  },
+
+  {
+    "model_config": "cnn_grid.json",
+    "model_ext" : "target_up20.json",
+    "env_config": "safe_minigrid_7_punish1.json"
+  },
+
+  {
+    "model_config": "cnn_grid.json",
+    "model_ext" : "target_up20.json",
+    "env_config": "safe_minigrid_7_punish10.json"
+  },
+
+  {
+    "model_config": "cnn_grid.json",
+    "model_ext" : "target_up20_lr0_001.json",
+    "env_config": "safe_minigrid_7_punish.json"
+  },
+
+  {
+    "model_config": "cnn_grid.json",
+    "model_ext" : "target_up20_lr0_001.json",
+    "env_config": "safe_minigrid_7_punish1.json"
+  },
+
+  {
+    "model_config": "cnn_grid.json",
+    "model_ext" : "target_up20_lr0_001.json",
+    "env_config": "safe_minigrid_7_punish10.json"
+  },
+
+  {
+    "model_config": "cnn_grid.json",
+    "model_ext" : "target_up20.json",
+    "env_config": "safe_minigrid_7.json"
+  },
+
+  {
+    "model_config": "cnn_grid.json",
+    "model_ext" : "target_up20_lr0_001.json",
+    "env_config": "safe_minigrid_7.json"
   }
+
+
 
 ]

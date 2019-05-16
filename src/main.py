@@ -85,7 +85,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
     writer = tensorboardX.SummaryWriter(expe_path)
 
     MAX_STATE_TO_REMEMBER = 50 # To avoid storing too much images in tensorboard
-    DEFAULT_LOG_STATS = 10
+    DEFAULT_LOG_STATS = 500
     log_stats_every = full_config.get("log_stats_every", DEFAULT_LOG_STATS)
 
     if "racing" in full_config["env_name"].lower():
@@ -222,16 +222,18 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
 
                     last_feedback_mean = np.mean(feedback_per_ep_list)
 
-                    writer.add_scalar("data/percentage_tile_seen", np.mean(percentage_tile_seen_list), total_iter)
+                    if "racing" in full_config["env_name"].lower():
+                        writer.add_scalar("data/percentage_tile_seen", np.mean(percentage_tile_seen_list), total_iter)
+
                     writer.add_scalar("data/number_of feedback", last_feedback_mean, total_iter)
 
-                    writer.add_scalar("data/reward_discounted", last_rewards_discount, total_iter)
-                    writer.add_scalar("data/reward_not_discounted", last_rewards_undiscount, total_iter)
+                    # writer.add_scalar("data/reward_discounted", last_rewards_discount, total_iter)
+                    # writer.add_scalar("data/reward_not_discounted", last_rewards_undiscount, total_iter)
 
-                    writer.add_scalar("data/running_mean_reward_discounted", reward_discount_mean, total_iter)
-                    writer.add_scalar("data/running_mean_reward_not_discounted", reward_undiscount_mean, total_iter)
+                    # writer.add_scalar("data/running_mean_reward_discounted", reward_discount_mean, total_iter)
+                    # writer.add_scalar("data/running_mean_reward_not_discounted", reward_undiscount_mean, total_iter)
                     writer.add_scalar("data/iter_per_ep", iter_this_ep_mean, total_iter)
-                    # writer.add_scalar("data/epsilon", model.current_eps, total_iter)
+                    writer.add_scalar("data/epsilon", model.current_eps, total_iter)
                     # writer.add_scalar("data/model_update", model.num_update_target, total_iter)
                     writer.add_scalar("data/n_episode_since_last_log", len(last_reward_discount_list), total_iter)
                     # writer.add_scalar("data/model_update_ep", model.num_update_target, num_episode)

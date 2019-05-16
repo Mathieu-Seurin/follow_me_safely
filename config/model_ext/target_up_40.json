@@ -1,9 +1,0 @@
-{
-  "name": "target_up_40",
-  "dqn_params": {
-
-    "update_every_n_ep" : 40
-
-
-  }
-}

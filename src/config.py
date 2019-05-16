@@ -9,7 +9,7 @@ EXPE_DEFAULT_CONFIG = {
     "env_ext" : '',
     "model_ext" : '',
     "seed": 42,
-    "exp_dir": "osef",
+    "exp_dir": "minigrid_baseline_grid",
     "local_test": False}
 
 def override_config_recurs(config, config_extension):

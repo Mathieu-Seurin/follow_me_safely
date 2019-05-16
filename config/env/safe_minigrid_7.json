@@ -6,9 +6,11 @@
 
   "n_frameskip" : 3,
 
+  "log_stats_every" : 1000,
+
   "stop" : {
     "episode_reward_mean" : 0.95,
-    "episodes_total" : 1500
+    "max_iter_expe" : 130000
   }
 }
 
