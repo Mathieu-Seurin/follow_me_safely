@@ -1,0 +1,10 @@
+{
+    "name" : "feedback_not_bad",
+    "dqn_params" : {
+        "learning_rate" : 0.0005,
+        "update_every_n_ep" : 30,
+        "classification_margin" : 0,
+        "classification_max_loss_weight" : 0.2,
+        "feedback_percentage_in_buffer" : 0.05
+    }
+}

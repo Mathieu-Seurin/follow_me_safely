@@ -1,5 +1,5 @@
 {
-  "name": "Minigrid-safe-size7-selfkill_punish0.1",
+  "name": "Minigrid-safe-selfkill_size7_punish",
 
   "reward_when_out" : -0.1,
   "size_env" : 7,
@@ -8,12 +8,11 @@
 
   "log_stats_every" : 1000,
 
-  "proba_self_destruct" : 0.05
+  "proba_self_kill" : 0.05,
 
   "stop" : {
     "episode_reward_mean" : 0.95,
     "max_iter_expe" : 130000
   }
-
 }
 

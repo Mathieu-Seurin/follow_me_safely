@@ -246,8 +246,13 @@ class DQNAgent(object):
             param.grad.data.clamp_(-1, 1)
         self.optimizer.step()
 
-        feedback_loss_weighted = feedback_loss_weighted.item() if isinstance(feedback_loss_weighted,
-                                                                             torch.FloatTensor) else 0
+        try:
+            feedback_loss_weighted = feedback_loss_weighted.item()
+        except AttributeError:
+            feedback_loss_weighted = 0
+
+        # feedback_loss_weighted = feedback_loss_weighted.item() if isinstance(feedback_loss_weighted,
+        #                                                                      torch.Tensor) else 0
 
         self.feedback_loss_logger.append(feedback_loss_weighted)
         self.q_loss_logger.append(q_loss.item())

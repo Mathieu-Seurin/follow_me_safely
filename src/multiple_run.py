@@ -28,7 +28,6 @@ if __name__ == "__main__":
     parser.add_argument("-grid_search_config", type=str)
     parser.add_argument("-grid_search_config2", type=str)
 
-
     parser.add_argument("-n_gpus", type=int, default=4)
     parser.add_argument("-n_seeds", type=int, default=1)
 

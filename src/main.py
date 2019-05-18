@@ -90,11 +90,11 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
 
     if "racing" in full_config["env_name"].lower():
         reset_when_out = full_config["reset_when_out"]
-        reward_when_out = full_config["reward_when_out"]
+        reward_when_falling = full_config["reward_when_out"]
         max_steps = full_config["max_steps"]
 
         game = CarRacingSafe(reset_when_out=reset_when_out,
-                             reward_when_out=reward_when_out,
+                             reward_when_out=reward_when_falling,
                              max_steps=max_steps)
 
         DEFAULT_FRAME_SKIP = 3
@@ -107,8 +107,12 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
 
         reward_when_falling = full_config["reward_when_out"]
         size = full_config["size_env"]
+        proba_self_kill = full_config["proba_self_kill"]
 
-        game = SafeCrossing(size=size, num_crossings=1, seed=seed, reward_when_falling=reward_when_falling)
+        game = SafeCrossing(size=size, num_crossings=1,
+                            seed=seed, reward_when_falling=reward_when_falling,
+                            proba_self_destruct=proba_self_kill)
+
         game = MinigridFrameStacker(game, full_config["n_frameskip"])
 
     else:
@@ -124,6 +128,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
     num_episode = 0
     early_stopping = False
 
+    reward_wo_feedback_list = []
     reward_undiscount_list = []
     reward_discount_list = []
     feedback_per_ep_list = []
@@ -133,6 +138,8 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
     last_reward_undiscount_list = []
     last_reward_discount_list = []
 
+    self_destruct_list = []
+    self_destruct_trial_list = []
 
     best_undiscount_reward = -float("inf")
 
@@ -161,10 +168,14 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
             #game.render('human')
             done = False
             iter_this_ep = 0
+            reward_wo_feedback = 0
             reward_total_discounted = 0
             reward_total_not_discounted = 0
             percentage_tile_seen = 0
+
             n_feedback_this_ep = 0
+
+            self_kill_trial = 0
 
             rendered_images = []
 
@@ -202,11 +213,14 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
 
                 percentage_tile_seen = max(info.get('percentage_road_visited', 0), percentage_tile_seen)
                 n_feedback_this_ep += info['gave_feedback']
+                self_kill_trial += info['tried_destruct']
 
                 assert max(next_state['gave_feedback']) == info['gave_feedback'], "Problem, info should contain the same info as state"
 
                 reward_total_discounted += reward * (discount_factor ** iter_this_ep)
                 reward_total_not_discounted += reward
+
+                reward_wo_feedback += reward - info['gave_feedback'] * reward_when_falling
 
 
                 #=======================
@@ -217,6 +231,8 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
 
                     last_rewards_discount = np.mean(last_reward_undiscount_list)
                     last_rewards_undiscount = np.mean(last_reward_discount_list)
+
+                    last_reward_wo_feedback = np.mean(reward_wo_feedback_list)
 
                     iter_this_ep_mean = np.mean(iter_this_ep_list)
 
@@ -229,6 +245,10 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
 
                     # writer.add_scalar("data/reward_discounted", last_rewards_discount, total_iter)
                     # writer.add_scalar("data/reward_not_discounted", last_rewards_undiscount, total_iter)
+
+                    writer.add_scalar("data/reward_wo_feedback(unbiaised)", last_reward_wo_feedback, total_iter)
+                    writer.add_scalar("data/self_destruct_trial", np.mean(self_destruct_trial_list), total_iter)
+                    writer.add_scalar("data/self_destruct", np.mean(self_destruct_list), total_iter)
 
                     # writer.add_scalar("data/running_mean_reward_discounted", reward_discount_mean, total_iter)
                     # writer.add_scalar("data/running_mean_reward_not_discounted", reward_undiscount_mean, total_iter)
@@ -250,7 +270,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
                     last_reward_undiscount_list = []
                     last_reward_discount_list = []
                     iter_this_ep_list = []
-
+                    reward_wo_feedback_list = []
 
             # DONE, GO HERE :
             # ================
@@ -274,6 +294,11 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
             feedback_per_ep_list.append(n_feedback_this_ep)
             percentage_tile_seen_list.append(percentage_tile_seen)
             iter_this_ep_list.append(iter_this_ep)
+
+            self_destruct_list.append(info['self_destruct'])
+            self_destruct_trial_list.append(self_kill_trial)
+            reward_wo_feedback_list.append(reward_wo_feedback)
+
 
             print("End of ep #{}, n_timesteps (estim) {}, iter_this_ep : {}, current_eps {}".format(
                 num_episode, total_iter, np.mean(iter_this_ep_list[-3:]), model.current_eps))
@@ -324,7 +349,7 @@ if __name__ == "__main__":
                          args.exp_dir,
                          args.seed,
                          args.local_test,
-                         override_expe=False))
+                         override_expe=True))
 
     print(a)
 
