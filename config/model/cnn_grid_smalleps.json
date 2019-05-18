@@ -1,5 +1,5 @@
 {
-  "name": "dqn_conv_grid_update_4_baseline",
+  "name": "dqn_conv_grid_smaller_eps",
 
   "agent_type" : "dqn",
   "discount_factor": 0.99,
@@ -32,7 +32,7 @@
     "exploration_method": {
       "name" : "eps_greedy",
       "begin_eps" : 1,
-      "expected_step_explo" : 30000,
+      "expected_step_explo" : 10000,
       "epsilon_minimum" : 0.04
 
     },

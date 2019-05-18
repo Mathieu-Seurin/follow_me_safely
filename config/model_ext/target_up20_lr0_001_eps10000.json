@@ -5,8 +5,9 @@
     "update_every_n_ep" : 20,
     "learning_rate" : 1e-3,
 
-    "",
-
+    "exploration_method": {
+      "expected_step_explo" : 10000
+    }
 
   }
 }

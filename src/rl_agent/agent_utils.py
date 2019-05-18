@@ -176,7 +176,7 @@ def feedback_bad_to_min_when_max(qs, action, feedback, margin, regression_loss):
         "Problem in loss, size 1 {}  size 2 : {}".format(min_qs_minus_margin.size(), qs_a_where_bad.size())
 
     assert qs_a_where_bad.requires_grad is True
-    assert min_qs_minus_margin.requires_grad is True
+    assert min_qs_minus_margin.requires_grad is False
 
     loss = regression_loss(min_qs_minus_margin, qs_a_where_bad) # Bring bad action down under margin
     return loss

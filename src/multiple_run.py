@@ -26,6 +26,9 @@ if __name__ == "__main__":
     parser.add_argument("-multiple_ext_config", type=str)
     parser.add_argument("-multiple_run_config", type=str)
     parser.add_argument("-grid_search_config", type=str)
+    parser.add_argument("-grid_search_config2", type=str)
+
+
     parser.add_argument("-n_gpus", type=int, default=4)
     parser.add_argument("-n_seeds", type=int, default=1)
 
@@ -40,6 +43,9 @@ if __name__ == "__main__":
 
     if args.grid_search_config:
         configs.extend(create_grid_search_config(args.grid_search_config))
+
+    if args.grid_search_config2:
+        configs.extend(create_grid_search_config(args.grid_search_config2))
 
     if args.n_seeds > 1:
         configs = extend_multiple_seed(configs, number_of_seed=args.n_seeds)

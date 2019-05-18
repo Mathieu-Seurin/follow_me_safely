@@ -1,4 +1,6 @@
-from rl_agent.agent_utils import Transition, ReplayMemory, ProportionReplayMemory, check_params_changed, feedback_bad_to_min_when_max, consistency_loss_dqfd
+from rl_agent.agent_utils import Transition, ReplayMemory, ProportionReplayMemory, \
+    feedback_bad_to_min_when_max, consistency_loss_dqfd, feedback_bad_to_percent_max
+
 import torch
 import torch.nn.functional as F
 
@@ -12,9 +14,13 @@ import tensorboardX
 
 class DQNAgent(object):
 
-    def __init__(self, config, n_action, state_dim, discount_factor, writer=None):
+    def __init__(self, config, n_action, state_dim, discount_factor, writer=None, log_stats_every=1e4):
 
         self.save_config = config
+        self.log_stats_every = log_stats_every
+
+        self.q_loss_logger = []
+        self.feedback_loss_logger = []
 
         self.discount_factor = discount_factor
         self.n_action = n_action.n
@@ -39,11 +45,15 @@ class DQNAgent(object):
         self.regression_loss = F.mse_loss
 
         # Use the feedback from the environment (aka : "Don't do this anymore!")
-        self.use_feedback_loss = config["classification_loss_weight"] > 0
-        if self.use_feedback_loss :
+        self.use_max_feedback_loss = config["classification_max_loss_weight"] > 0
+        if self.use_max_feedback_loss:
             self.classification_margin = config["classification_margin"]
-            self.feedback_loss = feedback_bad_to_min_when_max
-            self.classification_loss_weight = config["classification_loss_weight"]
+            self.classification_max_loss_weight = config["classification_max_loss_weight"]
+
+        self.use_percent_feedback_loss = config["classification_percent_loss_weight"] > 0
+        if self.use_percent_feedback_loss :
+            self.percent_classification_margin = config["percent_classification_margin"]
+            self.classification_percent_loss_weight = config["classification_percent_loss_weight"]
 
         # Temporal Consistency loss : see https://arxiv.org/pdf/1805.11593.pdf
         # To avoid over generalization
@@ -137,7 +147,7 @@ class DQNAgent(object):
             self.target_net.load_state_dict(self.policy_net.state_dict())
             self.num_update_target += 1
 
-    def optimize(self):
+    def optimize(self, total_iter):
         if len(self.memory) < self.batch_size:
             return
         transitions = self.memory.sample(self.batch_size)
@@ -180,7 +190,7 @@ class DQNAgent(object):
         action_selected_by_policy = self.policy_net(non_final_next_states).detach()
         action_selected_by_policy = action_selected_by_policy.max(1)[1]
 
-        next_state_values[non_final_mask] = next_state_action_values.gather(1, action_selected_by_policy.unsqueeze(1))
+        next_state_values[non_final_mask] = next_state_action_values.gather(1, action_selected_by_policy.unsqueeze(1)).view(-1)
 
         # Q learning : argmax selected on target
         #next_state_values[non_final_mask] = next_state_action_values.max(1)[0]
@@ -193,17 +203,26 @@ class DQNAgent(object):
         assert state_action_values.size() == expected_state_action_values.size()
         q_loss = F.smooth_l1_loss(state_action_values, expected_state_action_values)
 
-        if self.use_feedback_loss:
-            feedback_loss = self.feedback_loss(qs=state_values,
+        feedback_loss_weighted = 0
+
+        if self.use_max_feedback_loss:
+            feedback_loss = feedback_bad_to_min_when_max(qs=state_values,
                                                action=action_batch,
                                                feedback=feedback_batch,
                                                margin=self.classification_margin,
                                                regression_loss=self.regression_loss)
 
-            feedback_loss_weighted = feedback_loss * self.classification_loss_weight
-        else:
-            feedback_loss_weighted = 0
+            feedback_loss_weighted += feedback_loss * self.classification_max_loss_weight
 
+        if self.use_percent_feedback_loss:
+
+            assert feedback_loss_weighted == 0, "Cannot use 2 losses at the same time, should be 0"
+            feedback_loss = feedback_bad_to_percent_max(qs=state_values,
+                                                        action=action_batch,
+                                                        feedback=feedback_batch,
+                                                        regression_loss=self.regression_loss,
+                                                        max_margin=self.percent_classification_margin)
+            feedback_loss_weighted += feedback_loss * self.classification_percent_loss_weight
 
         if self.use_consistency_loss_dfqd:
             next_state_values_ref = next_state_action_values
@@ -217,7 +236,6 @@ class DQNAgent(object):
         # Compute the sum of all losses
         loss = q_loss + feedback_loss_weighted + consistency_loss_weighted
 
-
         # Optimize the model
         self.optimizer.zero_grad()
         loss.backward()
@@ -228,10 +246,21 @@ class DQNAgent(object):
             param.grad.data.clamp_(-1, 1)
         self.optimizer.step()
 
-        if self.summary_writer:
-            self.summary_writer.add_scalar("data/feedback_percentage_in_buffer", feedback_batch.mean().item(), self.num_optim_dqn)
+        feedback_loss_weighted = feedback_loss_weighted.item() if isinstance(feedback_loss_weighted,
+                                                                             torch.FloatTensor) else 0
+
+        self.feedback_loss_logger.append(feedback_loss_weighted)
+        self.q_loss_logger.append(q_loss.item())
+
+        if self.summary_writer and total_iter % self.log_stats_every == 0:
+            self.summary_writer.add_scalar("data/feedback_loss", np.mean(self.feedback_loss_logger), total_iter)
+            self.summary_writer.add_scalar("data/q_loss", np.mean(self.q_loss_logger), total_iter)
+            # self.summary_writer.add_scalar("data/feedback_percentage_in_buffer", feedback_batch.mean().item(), self.num_optim_dqn)
             # self.summary_writer.add_histogram("data/reward_in_batch_replay_buffer", reward_batch.detach().cpu().numpy(), self.num_update, bins=4)
             # self.summary_writer.add_histogramm("data/q_values", state_values.mean, self.num_update, bins=4)
+
+            self.feedback_loss_logger = []
+            self.q_loss_logger = []
 
         self.num_optim_dqn += 1
 

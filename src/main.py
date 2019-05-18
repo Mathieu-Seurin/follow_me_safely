@@ -142,7 +142,8 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
                          n_action=game.action_space,
                          state_dim=game.observation_space,
                          discount_factor=discount_factor,
-                         writer=None
+                         writer=writer,
+                         log_stats_every=log_stats_every
                          )
     else:
         raise NotImplementedError("{} not available for model".format(full_config["agent_type"]))
@@ -183,7 +184,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
                 next_state['gave_feedback'] = torch.FloatTensor([next_state['gave_feedback']])
 
                 model.push(state['state'].to('cpu'), action, next_state['state'], reward, next_state['gave_feedback'])
-                model.optimize()
+                model.optimize(total_iter=total_iter)
 
                 # Render state, and compute q values to visualize them later
                 if save_images_and_q_this_ep:
