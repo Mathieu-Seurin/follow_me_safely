@@ -30,7 +30,7 @@ class ReplayMemory(object):
         self.position = (self.position + 1) % self.capacity
 
     def sample(self, batch_size):
-        return [self.memory[sample] for sample in np.random.choice(len(self), batch_size)]
+        return [self.memory[sample] for sample in np.random.choice(len(self), batch_size, replace=True)]
 
     def __len__(self):
         return len(self.memory)
@@ -299,6 +299,7 @@ def feedback_bad_to_percent_max(qs, action, feedback, regression_loss, max_margi
         return 0
 
     max_qs_and_margin = max_qs_and_margin[index_where_action_too_close_to_max]
+    max_qs_and_margin = max_qs_and_margin.detach()
 
     # Actual classification loss
     assert max_qs_and_margin.size() == qs_a_where_bad.size(), \

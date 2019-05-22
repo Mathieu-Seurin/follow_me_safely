@@ -1,7 +1,7 @@
 {
-  "name": "Minigrid-safe-selfkill_size7_punish",
+  "name": "Minigrid-safe-selfkill_size7_punish1",
 
-  "reward_when_out" : -0.1,
+  "reward_when_out" : -1,
   "size_env" : 7,
 
   "n_frameskip" : 3,

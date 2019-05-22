@@ -1,0 +1,23 @@
+{
+  "common" : {
+    "env_config" : "safe_minigrid_7_selfkill.json",
+    "model_config" : "cnn_grid.json",
+    "seed" : 43
+  },
+
+  "env_ext" : [
+    "punish0.1.json",
+    "punish1.json",
+    "punish10.json"
+  ],
+
+  "model_ext" :
+          [
+            "target_up5_lr0_001.json",
+            "target_up2_lr0_001.json",
+            "target_up5_lr0_0005.json",
+            "target_up2_lr0_0005.json",
+            "target_up5_lr0_0001.json",
+            "target_up2_lr0_0001.json"
+          ]
+}

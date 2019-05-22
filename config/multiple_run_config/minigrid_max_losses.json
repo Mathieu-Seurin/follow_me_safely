@@ -1,12 +1,15 @@
 {
-  "model_config" : "cnn_grid_smalleps.json",
-  "env_config" : "safe_minigrid_7.json",
+  "model_config" : "cnn_grid.json",
+  "env_config" : "safe_minigrid_7_selfkill.json",
 
   "dqn_params": {
+
+    "feedback_percentage_in_buffer" : [0, 0.05],
+
     "learning_rate": [5e-4, 1e-3, 1e-4],
     "update_every_n_ep" : [5, 20, 2, 100],
 
     "classification_margin" : [0, 0.01],
-    "classification_max_loss_weight" : [0.0001, 0.001, 0.01, 0.1]
+    "classification_max_loss_weight" : [0.0001, 0.001, 0.01, 0.1, 0.2, 0.5, 1]
   }
 }

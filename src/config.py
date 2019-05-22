@@ -9,7 +9,7 @@ EXPE_DEFAULT_CONFIG = {
     "env_ext" : '',
     "model_ext" : '',
     "seed": 42,
-    "exp_dir": "minigrid_baseline_grid",
+    "exp_dir": "multiple_seed_run",
     "local_test": False}
 
 def override_config_recurs(config, config_extension):
@@ -52,7 +52,12 @@ def load_config(env_config_file, model_config_file, seed,
 
     # === Loading ENV config, extension and check integrity =====
     # ===========================================================
-    env_config = load_single_config(os.path.join("config", "env", env_config_file))
+    if type(env_config_file) is str:
+        env_config = load_single_config(os.path.join("config", "env", env_config_file))
+    else:
+        assert type(env_config_file) is dict,\
+            "Can be dict or str, but not something else, is {}\n{}".format(type(env_config_file), env_config_file)
+        env_config = env_config_file
 
     # Override env file if specified
     if env_ext_file:
@@ -80,7 +85,11 @@ def load_config(env_config_file, model_config_file, seed,
 
     # === Loading MODEL config, extension and check integrity =====
     # ===========================================================
-    model_config = load_single_config(os.path.join("config","model",model_config_file))
+    if type(model_config_file) is str:
+        model_config = load_single_config(os.path.join("config","model",model_config_file))
+    else:
+        assert type(model_config_file) is dict, "Problem, should be dict is {}\n{}".format(type(model_config_file), model_config_file)
+        model_config = model_config_file
 
     # Override model file if specified
     # Can be a dict of parameters or a str indicating the path to the extension
@@ -138,16 +147,53 @@ def read_multiple_ext_file(config_path):
     json_config = json.load(open(os.path.join("config/multiple_run_config", config_path), "r"))
 
     all_expe_to_run = []
+
     for ext in json_config["model_ext"]:
 
-        expe_config = EXPE_DEFAULT_CONFIG
+        expe_config = deepcopy(EXPE_DEFAULT_CONFIG)
         expe_config.update(json_config["common"])
 
         expe_config["model_ext"] = ext
 
         all_expe_to_run.append(expe_config)
 
+    env_ext_run = []
+
+    if json_config.get("env_ext", False):
+        for env_ext in json_config["env_ext"]:
+
+            for expe in all_expe_to_run :
+                temp_expe = deepcopy(expe)
+                temp_expe["env_ext"] = env_ext
+
+                env_ext_run.append(temp_expe)
+
+
+    all_expe_to_run.extend(env_ext_run)
+
     return all_expe_to_run
+
+def read_run_directory_again(config_path):
+
+    all_expe_to_run = []
+
+    for env_dir in os.listdir(config_path):
+
+        env_dir_full = os.path.join(config_path, env_dir)
+        env_config = json.load(open(os.path.join(env_dir_full, 'env_config.json'), "r"))
+
+        for expe_dir in os.listdir(env_dir_full):
+            expe_full_path = os.path.join(env_dir_full, expe_dir)
+            if os.path.isdir(expe_full_path):
+                model_config = json.load(open(os.path.join(expe_full_path, 'model_full_config.json'), "r"))
+
+                expe_config = deepcopy(EXPE_DEFAULT_CONFIG)
+                expe_config["model_config"] = model_config
+                expe_config["env_config"] = env_config
+                all_expe_to_run.append(expe_config)
+
+    return all_expe_to_run
+
 
 def read_multiple_config_file(config_path):
 

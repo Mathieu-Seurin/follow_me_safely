@@ -5,7 +5,7 @@ import json
 import ray
 
 import os
-from config import read_multiple_ext_file, read_multiple_config_file, create_grid_search_config, extend_multiple_seed
+from config import read_multiple_ext_file, read_multiple_config_file, create_grid_search_config, extend_multiple_seed, read_run_directory_again
 
 @ray.remote(num_gpus=0.3)
 def dummy_train_gpu(a):
@@ -27,6 +27,7 @@ if __name__ == "__main__":
     parser.add_argument("-multiple_run_config", type=str)
     parser.add_argument("-grid_search_config", type=str)
     parser.add_argument("-grid_search_config2", type=str)
+    parser.add_argument("-run_dir", type=str)
 
     parser.add_argument("-n_gpus", type=int, default=4)
     parser.add_argument("-n_seeds", type=int, default=1)
@@ -38,13 +39,16 @@ if __name__ == "__main__":
         configs.extend(read_multiple_config_file(args.multiple_run_config))
 
     if args.multiple_ext_config:
-        configs.extend(read_multiple_ext_file(args.multiple_ext))
+        configs.extend(read_multiple_ext_file(args.multiple_ext_config))
 
     if args.grid_search_config:
         configs.extend(create_grid_search_config(args.grid_search_config))
 
     if args.grid_search_config2:
         configs.extend(create_grid_search_config(args.grid_search_config2))
+
+    if args.run_dir:
+        configs.extend(read_run_directory_again(args.run_dir))
 
     if args.n_seeds > 1:
         configs = extend_multiple_seed(configs, number_of_seed=args.n_seeds)
@@ -53,6 +57,6 @@ if __name__ == "__main__":
 
     print("Number of expe to launch : {}".format(len(configs)))
 
-    ray.get([train.remote(**config, override_expe=False, save_images=False) for config in configs])
+    #ray.get([train.remote(**config, override_expe=False, save_images=False) for config in configs])
     #ray.get([train.remote(**config) for config in configs[10:12]])
     #ray.get([dummy_train.remote(config) for config in configs[:1]])
