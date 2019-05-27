@@ -149,6 +149,9 @@ class DQNAgent(object):
 
     def optimize(self, total_iter):
         if len(self.memory) < self.batch_size:
+            if self.summary_writer and total_iter % self.log_stats_every == 0:
+                self.summary_writer.add_scalar("data/feedback_loss", 0, total_iter)
+                self.summary_writer.add_scalar("data/q_loss", 0, total_iter)
             return
         transitions = self.memory.sample(self.batch_size)
         # Transpose the batch (see https://stackoverflow.com/a/19343/3343043 for

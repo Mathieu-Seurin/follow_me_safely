@@ -275,7 +275,7 @@ def extend_multiple_seed(all_expe_to_run, number_of_seed=2):
     for expe in all_expe_to_run:
         for n_seed in range(number_of_seed):
             new_expe = deepcopy(expe)
-            new_expe["seed"] = randint(0, 1e7)
+            new_expe["seed"] = n_seed
             extended_expe_list.append(new_expe)
 
     return extended_expe_list

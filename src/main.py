@@ -44,7 +44,6 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
         from xvfbwrapper import Xvfb
         display = Xvfb(width=100, height=100, colordepth=16)
 
-
     full_config, expe_path = load_config(env_config_file=env_config,
                               model_config_file=model_config,
                               env_ext_file=env_ext,
@@ -52,6 +51,14 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
                               out_dir=exp_dir,
                               seed=seed
                               )
+
+
+    MAX_STATE_TO_REMEMBER = 50 # To avoid storing too much images in tensorboard
+    DEFAULT_LOG_STATS = 500
+    log_stats_every = full_config.get("log_stats_every", DEFAULT_LOG_STATS)
+
+    max_iter_expe = full_config["stop"]["max_iter_expe"]
+    score_success = full_config["stop"]["episode_reward_mean"]
 
     if override_expe == False:
         # Check that the experiment has run more than a few episodes
@@ -61,17 +68,16 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
 
         for dir in os.listdir(expe_path):
 
-            last_ep = 0
+            last_iter = 0
 
             if "tfevents" in dir:
                 tf_event_path = os.path.join(expe_path,dir)
 
                 for i, elem in enumerate(tf.train.summary_iterator(tf_event_path)):
-                    for v in elem.summary.value:
-                        if 'episode' in v.tag:
-                            last_ep = max(int(v.simple_value), last_ep)
+                    if elem.step:
+                        last_iter = max(last_iter, elem.step)
 
-                if last_ep < 20:
+                if last_iter < max_iter_expe - log_stats_every:
                     os.remove(tf_event_path)
                     print("Experiment doesn't seem to be over, rerun.")
                 else:
@@ -84,9 +90,6 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
 
     writer = tensorboardX.SummaryWriter(expe_path)
 
-    MAX_STATE_TO_REMEMBER = 50 # To avoid storing too much images in tensorboard
-    DEFAULT_LOG_STATS = 500
-    log_stats_every = full_config.get("log_stats_every", DEFAULT_LOG_STATS)
 
     if "racing" in full_config["env_name"].lower():
         reset_when_out = full_config["reset_when_out"]
@@ -118,8 +121,6 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
     else:
         game = gym.make(full_config["env_name"])
 
-    max_iter_expe = full_config["stop"]["max_iter_expe"]
-    score_success = full_config["stop"]["episode_reward_mean"]
 
     discount_factor = full_config["discount_factor"]
     total_iter = 0
@@ -349,7 +350,7 @@ if __name__ == "__main__":
                          args.exp_dir,
                          args.seed,
                          args.local_test,
-                         override_expe=True))
+                         override_expe=False))
 
     print(a)
 
