@@ -220,7 +220,7 @@ class MinigridFrameStacker(gym.Wrapper):
 
         observation_space = dict()
         observation_space['gave_feedback'] = self.observation_space.spaces['gave_feedback']
-        observation_space['state'] = gym.spaces.Box(low=0, high=10, shape=(3*n_frameskip, 7, 7))
+        observation_space['state'] = gym.spaces.Box(low=0, high=11, shape=(3*n_frameskip, 7, 7))
         self.observation_space = gym.spaces.Dict(observation_space)
 
     def _unconvert(self, state):
@@ -228,9 +228,9 @@ class MinigridFrameStacker(gym.Wrapper):
         return x
 
     def stack_last_frame(self, obs):
+
         obs = obs.transpose(2, 0, 1)
         new_obs = np.concatenate((*self.last_frames, obs), axis=0)
-
         self.last_frames.append(obs)
         self.last_frames.pop(0)
 

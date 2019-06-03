@@ -2,8 +2,6 @@
   "model_config" : "cnn_grid.json",
   "env_config" : "safe_minigrid_quick.json",
 
-  "exp_dir" : "test_grid_out",
-
   "dqn_params": {
     "learning_rate": [5e-4, 3e-3],
     "classification_max_loss_weight" : [0.2, 0.7]

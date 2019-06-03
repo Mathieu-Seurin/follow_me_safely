@@ -110,7 +110,8 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
 
         reward_when_falling = full_config["reward_when_out"]
         size = full_config["size_env"]
-        proba_self_kill = full_config["proba_self_kill"]
+        #proba_self_kill = full_config.get("proba_self_kill",0)
+        proba_self_kill = 0
 
         game = SafeCrossing(size=size, num_crossings=1,
                             seed=seed, reward_when_falling=reward_when_falling,
@@ -156,7 +157,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
     else:
         raise NotImplementedError("{} not available for model".format(full_config["agent_type"]))
 
-    save_images_at = {0, 3, 20, 100, 200}
+    save_images_at = {1, 2, 3, 20, 100, 1000, 4000, 8000, 8001, 8002, 8003}
 
     with display as xvfb:
 
@@ -188,16 +189,6 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
 
             while not done:
 
-                action = model.select_action(state['state'])
-                next_state, reward, done, info = game.step(action=action.item())
-
-                reward = torch.FloatTensor([reward])
-                next_state['state'] = torch.FloatTensor(next_state['state']).unsqueeze(0)
-                next_state['gave_feedback'] = torch.FloatTensor([next_state['gave_feedback']])
-
-                model.push(state['state'].to('cpu'), action, next_state['state'], reward, next_state['gave_feedback'])
-                model.optimize(total_iter=total_iter)
-
                 # Render state, and compute q values to visualize them later
                 if save_images_and_q_this_ep:
                     array_rendered = render_state_and_q_values(model=model, game=game, state=state)
@@ -206,6 +197,20 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
                     # Save only the last frames, to avoid overloading tensorboard
                     if len(rendered_images) > MAX_STATE_TO_REMEMBER:
                         rendered_images.pop(0)
+
+                action = model.select_action(state['state'])
+                next_state, reward, done, info = game.step(action=action.item())
+
+                reward = torch.FloatTensor([reward])
+
+                if done:
+                    next_state['state'] = None
+                else:
+                    next_state['state'] = torch.FloatTensor(next_state['state']).unsqueeze(0)
+                next_state['gave_feedback'] = torch.FloatTensor([next_state['gave_feedback']])
+
+                model.push(state['state'].to('cpu'), action, next_state['state'], reward, next_state['gave_feedback'])
+                model.optimize(total_iter=total_iter)
 
                 state = next_state
 
@@ -344,13 +349,14 @@ if __name__ == "__main__":
 
     ray.init(num_gpus=1, local_mode=args.local_test)
     a = ray.get(train.remote(args.env_config,
-                         args.env_ext,
-                         args.model_config,
-                         args.model_ext,
-                         args.exp_dir,
-                         args.seed,
-                         args.local_test,
-                         override_expe=False))
+                             args.env_ext,
+                             args.model_config,
+                             args.model_ext,
+                             args.exp_dir,
+                             args.seed,
+                             args.local_test,
+                             override_expe=False,
+                             save_images=True))
 
     print(a)
 

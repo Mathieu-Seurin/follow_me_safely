@@ -32,6 +32,9 @@ if __name__ == "__main__":
     parser.add_argument("-n_gpus", type=int, default=4)
     parser.add_argument("-n_seeds", type=int, default=1)
 
+    parser.add_argument("-out_dir", type=str)
+
+
     args = parser.parse_args()
 
     configs = []
@@ -56,6 +59,11 @@ if __name__ == "__main__":
     ray.init(num_gpus=args.n_gpus)
 
     print("Number of expe to launch : {}".format(len(configs)))
+
+    if args.out_dir:
+        for config in configs:
+            config["exp_dir"] = args.out_dir
+
 
     ray.get([train.remote(**config, override_expe=False, save_images=False) for config in configs])
     #ray.get([train.remote(**config) for config in configs[10:12]])
