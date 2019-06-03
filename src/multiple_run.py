@@ -65,6 +65,6 @@ if __name__ == "__main__":
             config["exp_dir"] = args.out_dir
 
 
-    ray.get([train.remote(**config, override_expe=False, save_images=False) for config in configs])
+    ray.get([train.remote(**config, override_expe=False, save_images=True) for config in configs])
     #ray.get([train.remote(**config) for config in configs[10:12]])
     #ray.get([dummy_train.remote(config) for config in configs[:1]])

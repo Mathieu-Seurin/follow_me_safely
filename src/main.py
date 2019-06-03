@@ -157,7 +157,8 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
     else:
         raise NotImplementedError("{} not available for model".format(full_config["agent_type"]))
 
-    save_images_at = {1, 2, 3, 20, 100, 1000, 4000, 8000, 8001, 8002, 8003}
+    #save_images_at = {1, 2, 3, 20, 100, 1000, 4000, 8000, 8001, 8002, 8003}
+    save_images_at = {400, 401, 402, 403, 404, 1000, 1001, 1002, 1003, 1004}
 
     with display as xvfb:
 

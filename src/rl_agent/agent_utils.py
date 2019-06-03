@@ -290,7 +290,9 @@ def feedback_bad_to_percent_max(qs, action, feedback, regression_loss, max_margi
     qs_a_where_bad = qs_where_bad.gather(1, action_where_bad.view(-1,1))
 
     # Keep q(s,ab) where q(s,ab) is close to max_a q(s,a) by a certain margin
-    max_qs_and_margin = torch.max(qs_where_bad, dim=1)[0] * max_margin
+    max_qs = torch.max(qs_where_bad, dim=1)[0]
+
+    max_qs_and_margin = max_qs - torch.abs(max_qs) * max_margin
 
     index_where_action_too_close_to_max = qs_a_where_bad.view(-1) >= max_qs_and_margin
     qs_a_where_bad = qs_a_where_bad[index_where_action_too_close_to_max].view(-1)
@@ -306,7 +308,7 @@ def feedback_bad_to_percent_max(qs, action, feedback, regression_loss, max_margi
         "Problem in loss, size 1 {}  size 2 : {}".format(max_qs_and_margin.size(), qs_a_where_bad.size())
 
     assert max_qs_and_margin.requires_grad == False
-    assert qs_a_where_bad.requires_grad == True
+    # assert qs_a_where_bad.requires_grad == True
 
     loss = regression_loss(max_qs_and_margin, qs_a_where_bad) # Bring bad action down under margin
     return loss
@@ -354,6 +356,14 @@ if __name__ == "__main__":
     loss2 = feedback_bad_to_percent_max(qs, actions, feedback, regr_loss, max_margin)
 
     # assert loss1 > loss2, "loss1 {},  loss2 {}".format(loss1, loss2)
+
+    max_margin = 0.90  # If bad action is 90% of the max : Put it down niggah
+    qs = - torch.arange(12).view(4, 3).float()
+    actions = torch.Tensor([0, 1, 2, 0]).long()
+    feedback = torch.Tensor([1, 1, 1, 0])
+    loss3 = feedback_bad_to_percent_max(qs, actions, feedback, regr_loss, max_margin)
+
+
 
     print("Tests okay !")
 
