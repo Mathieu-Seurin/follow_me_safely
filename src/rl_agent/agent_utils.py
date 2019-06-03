@@ -314,7 +314,7 @@ def feedback_bad_to_percent_max(qs, action, feedback, regression_loss, max_margi
         "Problem in loss, size 1 {}  size 2 : {}".format(max_qs_and_margin.size(), qs_a_where_bad.size())
 
     assert max_qs_and_margin.requires_grad == False
-    # assert qs_a_where_bad.requires_grad == True
+    assert qs_a_where_bad.requires_grad == True
 
     loss = regression_loss(max_qs_and_margin, qs_a_where_bad) # Bring bad action down under margin
     return loss
