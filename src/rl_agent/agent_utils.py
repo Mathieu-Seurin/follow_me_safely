@@ -282,6 +282,9 @@ def feedback_bad_to_percent_max(qs, action, feedback, regression_loss, max_margi
     if feedback.sum() == 0:
         return 0
 
+    n_action = qs.size(1)
+    LIM_INF = -1e10
+
     # Ignore qs where the action is not flagged as bad
     qs_where_bad = qs[feedback != 0]
     action_where_bad = action[feedback != 0]
@@ -289,10 +292,13 @@ def feedback_bad_to_percent_max(qs, action, feedback, regression_loss, max_margi
     # Q(s, ab) => action taken was bad (feedback from env)
     qs_a_where_bad = qs_where_bad.gather(1, action_where_bad.view(-1,1))
 
-    # Keep q(s,ab) where q(s,ab) is close to max_a q(s,a) by a certain margin
-    max_qs = torch.max(qs_where_bad, dim=1)[0]
+    masking_bad_actions = torch.arange(n_action).unsqueeze(0).to(TORCH_DEVICE) == action_where_bad.view(-1, 1)
+    qs_where_bad_masked = qs_where_bad + masking_bad_actions.float() * LIM_INF # Float doesn't work, fuck this shit
 
-    max_qs_and_margin = max_qs - torch.abs(max_qs) * max_margin
+    # Keep q(s,ab) where q(s,ab) is close to max_a q(s,a) (except bad action) by a certain margin
+    max_qs = torch.max(qs_where_bad_masked, dim=1)[0]
+
+    max_qs_and_margin = max_qs - torch.abs(max_qs) * (1 - max_margin)
 
     index_where_action_too_close_to_max = qs_a_where_bad.view(-1) >= max_qs_and_margin
     qs_a_where_bad = qs_a_where_bad[index_where_action_too_close_to_max].view(-1)
@@ -344,7 +350,7 @@ if __name__ == "__main__":
     # Test 3
     qs = torch.arange(12).view(4, 3).float()
 
-    max_margin = 0.50 # If bad action is 50% of the max : Put it down niggah
+    max_margin = 0.90 # If bad action is 50% of the max : Put it down niggah
     actions = torch.Tensor([0, 1, 2, 0]).long()
     feedback = torch.Tensor([1, 1, 1, 0])
     loss1 = feedback_bad_to_percent_max(qs, actions, feedback, regr_loss, max_margin)
@@ -362,8 +368,6 @@ if __name__ == "__main__":
     actions = torch.Tensor([0, 1, 2, 0]).long()
     feedback = torch.Tensor([1, 1, 1, 0])
     loss3 = feedback_bad_to_percent_max(qs, actions, feedback, regr_loss, max_margin)
-
-
 
     print("Tests okay !")
 
