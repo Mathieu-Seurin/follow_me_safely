@@ -1,6 +1,8 @@
 from main import train
 import argparse
 
+import time
+
 import json
 import ray
 
@@ -64,7 +66,25 @@ if __name__ == "__main__":
         for config in configs:
             config["exp_dir"] = args.out_dir
 
+    done = False
+    while not done:
+        try:
+            list_success = ray.get([train.remote(**config, override_expe=False, save_images=True) for config in configs])
+        except ray.exceptions.RayWorkerError:
+            ray.shutdown()
+            ray.init(num_gpus=args.n_gpus)
+            continue
 
-    ray.get([train.remote(**config, override_expe=False, save_images=True) for config in configs])
+        if len(list_success) < len(configs):
+            continue
+
+        done = all(list_success)
+
+
+
+    print("All expes done, great !")
+
+
+
     #ray.get([train.remote(**config) for config in configs[10:12]])
     #ray.get([dummy_train.remote(config) for config in configs[:1]])

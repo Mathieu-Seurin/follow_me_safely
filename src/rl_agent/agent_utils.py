@@ -175,7 +175,7 @@ def feedback_bad_to_min_when_max(qs, action, feedback, margin, regression_loss):
     assert min_qs_minus_margin.size() == qs_a_where_bad.size(), \
         "Problem in loss, size 1 {}  size 2 : {}".format(min_qs_minus_margin.size(), qs_a_where_bad.size())
 
-    assert qs_a_where_bad.requires_grad is True
+    #assert qs_a_where_bad.requires_grad is True
     assert min_qs_minus_margin.requires_grad is False
 
     loss = regression_loss(min_qs_minus_margin, qs_a_where_bad) # Bring bad action down under margin
@@ -244,7 +244,7 @@ def render_state_and_q_values(model, game, state):
             color=[(0.1, 0.2, 0.8) if i != max_action else (0.8, 0.1, 0.1) for i in
                    range(game.action_space.n)], tick_label=[str(l) for l in game.env.action_map])
 
-    plt.xticks(fontsize=18, rotation=70)
+    plt.xticks(fontsize=10, rotation=70)
 
     plt.xlabel('action', fontsize=16)
     plt.ylabel('q_value', fontsize=16)
@@ -328,29 +328,29 @@ if __name__ == "__main__":
     margin = 0.1
 
     # Test 1
-    # qs = torch.arange(12).view(4,3).float()
-    # actions = torch.Tensor([0,0,0,0]).long()
-    # feedback = torch.Tensor([1,1,1,0])
-    #
-    # assert feedback_bad_to_min(qs, actions, feedback, margin, regr_loss) == 0
-    #
-    # # Test 2
-    # qs = torch.arange(12).view(4,3).float()
-    # actions = torch.Tensor([0,0,0,0]).long()
-    # feedback = torch.Tensor([1,1,1,0])
-    # loss1 = feedback_bad_to_min_when_max(qs, actions, feedback, margin, regr_loss)
-    #
-    # qs = torch.arange(12).view(4,3).float()
-    # actions = torch.Tensor([0,1,2,0]).long()
-    # feedback = torch.Tensor([1,1,1,0])
-    # loss2 = feedback_bad_to_min_when_max(qs, actions, feedback, margin, regr_loss)
-    #
-    # assert loss1 < loss2
+    qs = torch.arange(12).view(4,3).float()
+    actions = torch.Tensor([0,0,0,0]).long()
+    feedback = torch.Tensor([1,1,1,0])
+
+    assert feedback_bad_to_min_when_max(qs, actions, feedback, margin, regr_loss) == 0
+
+    # Test 2
+    qs = torch.arange(12).view(4,3).float()
+    actions = torch.Tensor([0,0,0,0]).long()
+    feedback = torch.Tensor([1,1,1,0])
+    loss1 = feedback_bad_to_min_when_max(qs, actions, feedback, margin, regr_loss)
+
+    qs = torch.arange(12).view(4,3).float()
+    actions = torch.Tensor([0,1,2,0]).long()
+    feedback = torch.Tensor([1,1,1,0])
+    loss2 = feedback_bad_to_min_when_max(qs, actions, feedback, margin, regr_loss)
+
+    assert loss1 < loss2
 
     # Test 3
     qs = torch.arange(12).view(4, 3).float()
 
-    max_margin = 0.90 # If bad action is 50% of the max : Put it down niggah
+    max_margin = 0.50 # If bad action is 50% of the max : Put it down niggah
     actions = torch.Tensor([0, 1, 2, 0]).long()
     feedback = torch.Tensor([1, 1, 1, 0])
     loss1 = feedback_bad_to_percent_max(qs, actions, feedback, regr_loss, max_margin)

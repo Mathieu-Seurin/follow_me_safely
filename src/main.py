@@ -85,7 +85,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
 
         if rerun_expe == False:
             print("Expe was over, don't rerun")
-            return False
+            return True
 
 
     writer = tensorboardX.SummaryWriter(expe_path)
@@ -110,12 +110,24 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
 
         reward_when_falling = full_config["reward_when_out"]
         size = full_config["size_env"]
-        #proba_self_kill = full_config.get("proba_self_kill",0)
-        proba_self_kill = 0
+        feedback_when_wall_hit = full_config["feedback_when_wall_hit"]
+        proba_reset = full_config["proba_reset"]
+        use_lava = full_config["use_lava"]
+        n_zone = full_config["n_zone"]
+        good_zone_action_proba = full_config["good_zone_action_proba"]
+        bad_zone_action_proba = full_config["bad_zone_action_proba"]
+        obstacle_type = full_config["obstacle_type"]
 
-        game = SafeCrossing(size=size, num_crossings=1,
-                            seed=seed, reward_when_falling=reward_when_falling,
-                            proba_self_destruct=proba_self_kill)
+        game = SafeCrossing(size=size,
+                            reward_when_falling=reward_when_falling,
+                            proba_reset = proba_reset,
+                            feedback_when_wall_hit=feedback_when_wall_hit,
+                            use_lava=use_lava,
+                            n_zone=n_zone,
+                            good_zone_action_proba=good_zone_action_proba,
+                            bad_zone_action_proba=bad_zone_action_proba,
+                            obstacle_type=obstacle_type,
+                            seed=seed)
 
         game = MinigridFrameStacker(game, full_config["n_frameskip"])
 
@@ -158,7 +170,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
         raise NotImplementedError("{} not available for model".format(full_config["agent_type"]))
 
     #save_images_at = {1, 2, 3, 20, 100, 1000, 4000, 8000, 8001, 8002, 8003}
-    save_images_at = {400, 401, 402, 403, 404, 1000, 1001, 1002, 1003, 1004}
+    save_images_at = {50, 51, 52, 53, 2000, 2001, 2002, 2003, 2004}
 
     with display as xvfb:
 
@@ -254,7 +266,9 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
                     # writer.add_scalar("data/reward_not_discounted", last_rewards_undiscount, total_iter)
 
                     writer.add_scalar("data/reward_wo_feedback(unbiaised)", last_reward_wo_feedback, total_iter)
-                    writer.add_scalar("data/self_destruct_trial", np.mean(self_destruct_trial_list), total_iter)
+                    writer.add_scalar("data/n_episodes", num_episode, total_iter)
+
+                    #writer.add_scalar("data/self_destruct_trial", np.mean(self_destruct_trial_list), total_iter)
                     writer.add_scalar("data/self_destruct", np.mean(self_destruct_list), total_iter)
 
                     # writer.add_scalar("data/running_mean_reward_discounted", reward_discount_mean, total_iter)

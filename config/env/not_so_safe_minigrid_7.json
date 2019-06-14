@@ -1,5 +1,5 @@
 {
-  "name": "Minigrid-safe-selfkill-size7",
+  "name": "Minigrid-not-so-safe-size7",
 
   "reward_when_out" : 0,
   "size_env" : 7,
@@ -8,7 +8,10 @@
 
   "log_stats_every" : 1000,
 
-  "proba_self_kill" : 0.01,
+  "feedback_when_wall_hit" : 0,
+
+  "proba_reset" : 0.8,
+
 
   "stop" : {
     "episode_reward_mean" : 0.95,

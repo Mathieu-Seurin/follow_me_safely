@@ -1,0 +1,27 @@
+{
+  "name": "Minigrid-safe-size7_zone9_water",
+
+  "size_env" : 7,
+  "n_frameskip" : 3,
+  "log_stats_every" : 1000,
+
+  "reward_when_out" : 0,
+  "feedback_when_wall_hit" : 1,
+
+  "n_zone" : 3,
+
+  "good_zone_action_proba" : 0.99,
+  "bad_zone_action_proba" : 0.4,
+
+  "use_lava" : false,
+
+  "obstacle_type" : "water",
+
+  "proba_reset" : 0,
+
+  "stop" : {
+    "episode_reward_mean" : 0.95,
+    "max_iter_expe" : 200000
+  }
+}
+

@@ -1,6 +1,6 @@
 {
   "model_config" : "cnn_grid.json",
-  "env_config" : "safe_minigrid_7.json",
+  "env_config" : "safe_minigrid_7_zone.json",
 
   "dqn_params": {
 

@@ -1,6 +1,6 @@
 {
   "common" : {
-    "env_config" : "safe_minigrid_7.json",
+    "env_config" : "safe_minigrid_7_test.json",
     "model_config" : "cnn_grid.json",
     "seed" : 43
   },
