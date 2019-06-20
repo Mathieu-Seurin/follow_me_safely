@@ -221,6 +221,8 @@ class MinigridFrameStacker(gym.Wrapper):
 
         observation_space = dict()
         observation_space['gave_feedback'] = self.observation_space.spaces['gave_feedback']
+        observation_space['zone'] = self.observation_space.spaces['zone']
+
         observation_space['state'] = gym.spaces.Box(low=0, high=len(COLORS), shape=(3*n_frameskip, 7, 7))
         self.observation_space = gym.spaces.Dict(observation_space)
 
@@ -246,6 +248,7 @@ class MinigridFrameStacker(gym.Wrapper):
         new_obs = dict()
         new_obs['state'] = self.stack_last_frame(obs['state'])
         new_obs['gave_feedback'] = False
+        new_obs['zone'] = self.env.current_zone_num
 
         assert self.observation_space.contains(new_obs), "Observation don't match observation space"
         return new_obs
@@ -257,6 +260,7 @@ class MinigridFrameStacker(gym.Wrapper):
         new_obs = dict()
         new_obs['state'] = self.stack_last_frame(obs['state'])
         new_obs['gave_feedback'] = obs['gave_feedback']
+        new_obs['zone'] = obs['zone']
 
         assert self.observation_space.contains(new_obs), "Problem, observation don't match observation space."
         return new_obs, reward, done, info

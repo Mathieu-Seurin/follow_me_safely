@@ -326,26 +326,19 @@ def feedback_frontier_margin(qs, action, feedback, margin, regression_loss, test
     ab is the "bad" action
     m is a margin function
     """
-
-
-    if feedback.mean() in [0,1]:
-        return 0
+    # if feedback.mean() in [0,1]:
+    #     return 0
 
     n_action = qs.size(1)
 
-    # Keep qs where a feedback from environment was given.
-    qs_where_bad = qs[feedback != 0]
-    action_where_bad = action[feedback != 0]
-    # Q(s, ab) => action taken was bad (feedback from env)
-    qs_a_where_bad = qs_where_bad.gather(1, action_where_bad.view(-1, 1)).squeeze(1)
+    qs_a = qs.gather(1, action)
 
-    qs_where_good = qs[feedback == 0]
-    action_where_good = action[feedback == 0]
-    qs_a_where_good = qs_where_good.gather(1, action_where_good.view(-1, 1)).squeeze(1)
+    qs_a_where_good = qs_a[feedback == 0]
+    qs_a_where_bad = qs_a[feedback == 1]
 
     # Compute frontier with margin
-    min_good = torch.min(qs_a_where_good) - margin
-    max_bad = torch.max(qs_a_where_bad) + margin
+    min_good = torch.Tensor([-2]) #torch.min(qs_a_where_good) - margin
+    max_bad = torch.tensor([2])  #torch.max(qs_a_where_bad) + margin
 
     min_good = min_good.item()
     max_bad = max_bad.item()
@@ -440,11 +433,11 @@ if __name__ == "__main__":
     #==================================================
 
     qs = torch.arange(21).view(7, 3).float()
-    actions = torch.Tensor([1, 2, 1, 0, 2 , 1, 0]).long()
+    actions = torch.Tensor([1, 2, 1, 0, 2 , 1, 0]).long().view(-1, 1)
     feedback = torch.Tensor([1, 0, 1, 0, 1, 0, 1])
     loss1 = feedback_frontier_margin(qs, actions, feedback, margin, regr_loss, testing=True)
 
-    actions = torch.Tensor([1, 2, 1, 0, 2, 1, 0]).long()
+    actions = torch.Tensor([[1, 2, 1, 0, 2, 1, 0]]).long().view(-1, 1)
     feedback = torch.Tensor([1, 0, 1, 0, 1, 0, 1])
 
     qs = - torch.arange(21).view(7, 3).float()

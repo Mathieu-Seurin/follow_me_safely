@@ -205,7 +205,6 @@ class DQNAgent(object):
         reward_batch = torch.cat(batch.reward).to(TORCH_DEVICE)
         feedback_batch = torch.cat(batch.gave_feedback).to(TORCH_DEVICE)
 
-
         # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
         # columns of actions taken. These are the actions which would've been taken
         # for each batch state according to policy_net
@@ -292,7 +291,8 @@ class DQNAgent(object):
         if self.clip_grad:
             for param in self.policy_net.parameters():
                 param.grad.data.clamp_(-1, 1)
-            self.optimizer.step()
+
+        self.optimizer.step()
 
         try:
             nudging_loss_weighted = nudging_loss_weighted.item()

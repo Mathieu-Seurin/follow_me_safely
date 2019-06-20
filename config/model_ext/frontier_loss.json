@@ -1,13 +1,25 @@
 {
-  "name" : "strong_frontier_loss_supervised_no_q_loss",
+  "name" : "strong_frontier_batch_lr_test_small_decay_no_clip",
 
   "dqn_params" : {
-    "learning_rate" : 0.0001,
+    "learning_rate" : 1e-4,
     "update_every_n_ep" : 40,
-    "nudging_loss_weight" : 0.5,
-    "nudging_margin" : 0,
+    "nudging_loss_weight" : 1,
+    "nudging_margin" : 1,
     "nudging_type" : "frontier",
 
-    "supervised_loss_weight" : 1
+    "clamp_grad" : false,
+
+    "batch_size" : 512,
+    "weight_decay" : 0,
+
+    "exploration_method": {
+      "begin_eps" : 1,
+      "expected_step_explo" : 2000,
+      "epsilon_minimum" : 0.01
+
+    },
+
+    "supervised_loss_weight" : 0
     }
 }

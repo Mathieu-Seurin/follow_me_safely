@@ -1,0 +1,29 @@
+{
+  "name": "Minigrid-safe-size7_zone2",
+
+  "size_env" : 7,
+  "n_frameskip" : 3,
+  "log_stats_every" : 1000,
+
+  "reward_when_out" : 0,
+  "feedback_when_wall_hit" : 0,
+
+  "n_zone" : 2,
+
+  "good_zone_action_proba" : 1,
+  "bad_zone_action_proba" : 0,
+
+  "use_lava" : false,
+
+  "obstacle_type" : "none",
+
+  "proba_reset" : 0,
+
+  "save_images_at" : [100, 101, 102],
+
+  "stop" : {
+    "episode_reward_mean" : 0.95,
+    "max_iter_expe" : 150000
+  }
+}
+

@@ -321,8 +321,8 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
             reward_wo_feedback_list.append(reward_wo_feedback)
 
 
-            print("End of ep #{}, n_timesteps (estim) {}, iter_this_ep : {}, current_eps {}".format(
-                num_episode, total_iter, np.mean(iter_this_ep_list[-3:]), model.current_eps))
+            print("End of ep #{}, n_timesteps (estim) {}, iter_this_ep : {}, current_eps {}, zone {}".format(
+                num_episode, total_iter, np.mean(iter_this_ep_list[-3:]), model.current_eps, state['zone']))
 
             print("(Estim) Discounted rew : {} undiscounted : {}, n_feedback {} \n\n".format(
                 np.mean(last_reward_discount_list[-3:]), np.mean(last_reward_undiscount_list[-3:]), np.mean(feedback_per_ep_list[-3:])))
