@@ -1,0 +1,13 @@
+{
+  "name" : "strong_frontier_loss_supervised_no_q_loss",
+
+  "dqn_params" : {
+    "learning_rate" : 0.0001,
+    "update_every_n_ep" : 40,
+    "nudging_loss_weight" : 0.5,
+    "nudging_margin" : 0,
+    "nudging_type" : "frontier",
+
+    "supervised_loss_weight" : 1
+    }
+}

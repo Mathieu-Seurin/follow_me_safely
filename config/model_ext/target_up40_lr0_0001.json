@@ -1,0 +1,7 @@
+{
+  "name": "target_up40_lr0_0001.json",
+  "dqn_params": {
+    "update_every_n_ep" : 40,
+    "learning_rate" : 1e-4
+  }
+}

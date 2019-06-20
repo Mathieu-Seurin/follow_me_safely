@@ -8,6 +8,7 @@ from skimage import color
 from env_tools.car_racing import CarRacingSafe
 
 from gym_minigrid.envs.safe_crossing import SafeCrossing
+from gym_minigrid.minigrid import COLORS
 
 class PreprocessWrapperPytorch(gym.core.ObservationWrapper):
     def __init__(self, env):
@@ -220,7 +221,7 @@ class MinigridFrameStacker(gym.Wrapper):
 
         observation_space = dict()
         observation_space['gave_feedback'] = self.observation_space.spaces['gave_feedback']
-        observation_space['state'] = gym.spaces.Box(low=0, high=11, shape=(3*n_frameskip, 7, 7))
+        observation_space['state'] = gym.spaces.Box(low=0, high=len(COLORS), shape=(3*n_frameskip, 7, 7))
         self.observation_space = gym.spaces.Dict(observation_space)
 
     def _unconvert(self, state):

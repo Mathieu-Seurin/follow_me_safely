@@ -1,0 +1,12 @@
+{
+    "name" : "min_loss_test",
+
+    "dqn_params" : {
+        "learning_rate" : 0.0005,
+        "update_every_n_ep" : 30,
+
+        "classification_loss_weight" : 0.1,
+        "classification_margin" : 0.2,
+        "classification_type" : "min"
+    }
+}

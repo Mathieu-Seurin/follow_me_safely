@@ -35,8 +35,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
 
     if not local_test:
         assert len(ray.get_gpu_ids()) == 1
-
-    assert torch.cuda.device_count() == 1, "Should be only 1, is {}".format(torch.cuda.device_count())
+        assert torch.cuda.device_count() == 1, "Should be only 1, is {}".format(torch.cuda.device_count())
 
     if local_test:
         display = open('nothing.txt', 'w')
@@ -169,8 +168,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
     else:
         raise NotImplementedError("{} not available for model".format(full_config["agent_type"]))
 
-    #save_images_at = {1, 2, 3, 20, 100, 1000, 4000, 8000, 8001, 8002, 8003}
-    save_images_at = {50, 51, 52, 53, 2000, 2001, 2002, 2003, 2004}
+    save_images_at = set(full_config["save_images_at"])
 
     with display as xvfb:
 
@@ -260,7 +258,9 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
                     if "racing" in full_config["env_name"].lower():
                         writer.add_scalar("data/percentage_tile_seen", np.mean(percentage_tile_seen_list), total_iter)
 
-                    writer.add_scalar("data/number_of feedback", last_feedback_mean, total_iter)
+                    writer.add_scalar("data/number_of_feedback", last_feedback_mean, total_iter)
+
+                    writer.add_scalar("data/number_of_feedback_over_iter_per_ep", last_feedback_mean / iter_this_ep_mean, total_iter)
 
                     # writer.add_scalar("data/reward_discounted", last_rewards_discount, total_iter)
                     # writer.add_scalar("data/reward_not_discounted", last_rewards_undiscount, total_iter)
@@ -269,12 +269,12 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
                     writer.add_scalar("data/n_episodes", num_episode, total_iter)
 
                     #writer.add_scalar("data/self_destruct_trial", np.mean(self_destruct_trial_list), total_iter)
-                    writer.add_scalar("data/self_destruct", np.mean(self_destruct_list), total_iter)
+                    #writer.add_scalar("data/self_destruct", np.mean(self_destruct_list), total_iter)
 
                     # writer.add_scalar("data/running_mean_reward_discounted", reward_discount_mean, total_iter)
                     # writer.add_scalar("data/running_mean_reward_not_discounted", reward_undiscount_mean, total_iter)
                     writer.add_scalar("data/iter_per_ep", iter_this_ep_mean, total_iter)
-                    writer.add_scalar("data/epsilon", model.current_eps, total_iter)
+                    #writer.add_scalar("data/epsilon", model.current_eps, total_iter)
                     # writer.add_scalar("data/model_update", model.num_update_target, total_iter)
                     writer.add_scalar("data/n_episode_since_last_log", len(last_reward_discount_list), total_iter)
                     # writer.add_scalar("data/model_update_ep", model.num_update_target, num_episode)

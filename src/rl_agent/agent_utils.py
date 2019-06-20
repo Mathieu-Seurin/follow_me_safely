@@ -175,7 +175,7 @@ def feedback_bad_to_min_when_max(qs, action, feedback, margin, regression_loss):
     assert min_qs_minus_margin.size() == qs_a_where_bad.size(), \
         "Problem in loss, size 1 {}  size 2 : {}".format(min_qs_minus_margin.size(), qs_a_where_bad.size())
 
-    #assert qs_a_where_bad.requires_grad is True
+    assert qs_a_where_bad.requires_grad is True
     assert min_qs_minus_margin.requires_grad is False
 
     loss = regression_loss(min_qs_minus_margin, qs_a_where_bad) # Bring bad action down under margin
@@ -217,6 +217,9 @@ def feedback_bad_to_min(qs, action, feedback, margin, regression_loss):
     # Compute Q(s,a) - l(a_b, a)
     ref_qs = qs_where_bad.detach() # You optimize with respect to this ref_qs minus the margin, so you need to detach
     min_qs_minus_margin, _ = torch.min(ref_qs - margin_malus, dim=1)
+
+    assert qs_a_where_bad.requires_grad is True
+    assert min_qs_minus_margin.requires_grad is False
 
     # Actual classification loss
     assert min_qs_minus_margin.size() == qs_a_where_bad.size(),\
@@ -260,11 +263,7 @@ def render_state_and_q_values(model, game, state):
 
     return array_rendered
 
-def feedback_bad_to_second(qs, action, feedback, regression_loss, max_margin):
-    # todo
-    pass
-
-def feedback_bad_to_percent_max(qs, action, feedback, regression_loss, max_margin):
+def feedback_bad_to_percent_max(qs, action, feedback, margin, regression_loss):
     """
     VERSION 4 : Applied only when Q(s,ab) is close to the max Q by a certain margin in % instead of absolute value
 
@@ -298,7 +297,7 @@ def feedback_bad_to_percent_max(qs, action, feedback, regression_loss, max_margi
     # Keep q(s,ab) where q(s,ab) is close to max_a q(s,a) (except bad action) by a certain margin
     max_qs = torch.max(qs_where_bad_masked, dim=1)[0]
 
-    max_qs_and_margin = max_qs - torch.abs(max_qs) * (1 - max_margin)
+    max_qs_and_margin = max_qs - torch.abs(max_qs) * (1 - margin)
 
     index_where_action_too_close_to_max = qs_a_where_bad.view(-1) >= max_qs_and_margin
     qs_a_where_bad = qs_a_where_bad[index_where_action_too_close_to_max].view(-1)
@@ -320,6 +319,68 @@ def feedback_bad_to_percent_max(qs, action, feedback, regression_loss, max_margi
     return loss
 
 
+def feedback_frontier_margin(qs, action, feedback, margin, regression_loss, testing=False):
+    """
+    Compute the expert loss
+
+    ab is the "bad" action
+    m is a margin function
+    """
+
+
+    if feedback.mean() in [0,1]:
+        return 0
+
+    n_action = qs.size(1)
+
+    # Keep qs where a feedback from environment was given.
+    qs_where_bad = qs[feedback != 0]
+    action_where_bad = action[feedback != 0]
+    # Q(s, ab) => action taken was bad (feedback from env)
+    qs_a_where_bad = qs_where_bad.gather(1, action_where_bad.view(-1, 1)).squeeze(1)
+
+    qs_where_good = qs[feedback == 0]
+    action_where_good = action[feedback == 0]
+    qs_a_where_good = qs_where_good.gather(1, action_where_good.view(-1, 1)).squeeze(1)
+
+    # Compute frontier with margin
+    min_good = torch.min(qs_a_where_good) - margin
+    max_bad = torch.max(qs_a_where_bad) + margin
+
+    min_good = min_good.item()
+    max_bad = max_bad.item()
+
+    # Bring good actions above the max of bad actions
+    qs_a_where_good_below_max = qs_a_where_good[qs_a_where_good < max_bad]
+    if qs_a_where_good_below_max.size()[0] == 0:
+        loss_good = 0
+    else:
+        max_bad_vec = torch.ones_like(qs_a_where_good_below_max)
+        max_bad_vec[:] = max_bad
+
+        if not testing:
+            assert max_bad_vec.requires_grad == False
+            assert qs_a_where_good_below_max.requires_grad == True
+
+        loss_good = regression_loss(qs_a_where_good_below_max, max_bad_vec)
+
+    # Bring bad actions below the min of good actions
+    qs_a_where_bad_above_min = qs_a_where_bad[qs_a_where_bad > min_good]
+    if qs_a_where_bad_above_min.size()[0] == 0:
+        loss_bad = 0
+    else:
+        min_good_vec = torch.ones_like(qs_a_where_bad_above_min)
+        min_good_vec[:] = min_good
+
+        if not testing:
+            assert min_good_vec.requires_grad == False
+            assert qs_a_where_bad_above_min.requires_grad == True
+
+        loss_bad = regression_loss(qs_a_where_bad_above_min, min_good_vec)
+
+    return loss_good + loss_bad
+
+
 if __name__ == "__main__":
 
     import torch
@@ -327,47 +388,68 @@ if __name__ == "__main__":
     regr_loss = torch.nn.functional.smooth_l1_loss
     margin = 0.1
 
-    # Test 1
-    qs = torch.arange(12).view(4,3).float()
-    actions = torch.Tensor([0,0,0,0]).long()
-    feedback = torch.Tensor([1,1,1,0])
+    # # Test 1
+    # qs = torch.arange(12).view(4,3).float()
+    # actions = torch.Tensor([0,0,0,0]).long()
+    # feedback = torch.Tensor([1,1,1,0])
+    #
+    # assert feedback_bad_to_min_when_max(qs, actions, feedback, margin, regr_loss) == 0
+    #
+    # # Test 2
+    # qs = torch.arange(12).view(4,3).float()
+    # actions = torch.Tensor([0,0,0,0]).long()
+    # feedback = torch.Tensor([1,1,1,0])
+    # loss1 = feedback_bad_to_min_when_max(qs, actions, feedback, margin, regr_loss)
+    #
+    # qs = torch.arange(12).view(4,3).float()
+    # actions = torch.Tensor([0,1,2,0]).long()
+    # feedback = torch.Tensor([1,1,1,0])
+    # loss2 = feedback_bad_to_min_when_max(qs, actions, feedback, margin, regr_loss)
+    #
+    # assert loss1 < loss2
+    #
+    # # Test 3
+    # qs = torch.arange(12).view(4, 3).float()
+    #
+    # max_margin = 0.50 # If bad action is 50% of the max : Put it down niggah
+    # actions = torch.Tensor([0, 1, 2, 0]).long()
+    # feedback = torch.Tensor([1, 1, 1, 0])
+    # loss1 = feedback_bad_to_percent_max(qs, actions, feedback, regr_loss, max_margin)
+    #
+    # max_margin = 0.90 # If bad action is 90% of the max : Put it down niggah
+    # qs = torch.arange(12).view(4, 3).float()
+    # actions = torch.Tensor([0, 1, 2, 0]).long()
+    # feedback = torch.Tensor([1, 1, 1, 0])
+    # loss2 = feedback_bad_to_percent_max(qs, actions, feedback, regr_loss, max_margin)
+    #
+    # # assert loss1 > loss2, "loss1 {},  loss2 {}".format(loss1, loss2)
+    #
+    # max_margin = 0.90  # If bad action is 90% of the max : Put it down niggah
+    # qs = - torch.arange(12).view(4, 3).float()
+    # actions = torch.Tensor([0, 1, 2, 0]).long()
+    # feedback = torch.Tensor([1, 1, 1, 0])
+    # loss3 = feedback_bad_to_percent_max(qs, actions, feedback, regr_loss, max_margin)
+    #
+    # #=================================================
+    #
+    # qs = torch.arange(12).view(4,3).float()
+    # actions = torch.Tensor([1,2,1,0]).long()
+    # feedback = torch.Tensor([1,1,1,0])
+    # loss1 = feedback_bad_to_min(qs, actions, feedback, margin, regr_loss)
 
-    assert feedback_bad_to_min_when_max(qs, actions, feedback, margin, regr_loss) == 0
+    #==================================================
 
-    # Test 2
-    qs = torch.arange(12).view(4,3).float()
-    actions = torch.Tensor([0,0,0,0]).long()
-    feedback = torch.Tensor([1,1,1,0])
-    loss1 = feedback_bad_to_min_when_max(qs, actions, feedback, margin, regr_loss)
+    qs = torch.arange(21).view(7, 3).float()
+    actions = torch.Tensor([1, 2, 1, 0, 2 , 1, 0]).long()
+    feedback = torch.Tensor([1, 0, 1, 0, 1, 0, 1])
+    loss1 = feedback_frontier_margin(qs, actions, feedback, margin, regr_loss, testing=True)
 
-    qs = torch.arange(12).view(4,3).float()
-    actions = torch.Tensor([0,1,2,0]).long()
-    feedback = torch.Tensor([1,1,1,0])
-    loss2 = feedback_bad_to_min_when_max(qs, actions, feedback, margin, regr_loss)
+    actions = torch.Tensor([1, 2, 1, 0, 2, 1, 0]).long()
+    feedback = torch.Tensor([1, 0, 1, 0, 1, 0, 1])
 
-    assert loss1 < loss2
+    qs = - torch.arange(21).view(7, 3).float()
+    loss2s = feedback_frontier_margin(qs, actions, feedback, margin, regr_loss, testing=True)
 
-    # Test 3
-    qs = torch.arange(12).view(4, 3).float()
-
-    max_margin = 0.50 # If bad action is 50% of the max : Put it down niggah
-    actions = torch.Tensor([0, 1, 2, 0]).long()
-    feedback = torch.Tensor([1, 1, 1, 0])
-    loss1 = feedback_bad_to_percent_max(qs, actions, feedback, regr_loss, max_margin)
-
-    max_margin = 0.90 # If bad action is 90% of the max : Put it down niggah
-    qs = torch.arange(12).view(4, 3).float()
-    actions = torch.Tensor([0, 1, 2, 0]).long()
-    feedback = torch.Tensor([1, 1, 1, 0])
-    loss2 = feedback_bad_to_percent_max(qs, actions, feedback, regr_loss, max_margin)
-
-    # assert loss1 > loss2, "loss1 {},  loss2 {}".format(loss1, loss2)
-
-    max_margin = 0.90  # If bad action is 90% of the max : Put it down niggah
-    qs = - torch.arange(12).view(4, 3).float()
-    actions = torch.Tensor([0, 1, 2, 0]).long()
-    feedback = torch.Tensor([1, 1, 1, 0])
-    loss3 = feedback_bad_to_percent_max(qs, actions, feedback, regr_loss, max_margin)
 
     print("Tests okay !")
 

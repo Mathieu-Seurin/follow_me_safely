@@ -29,6 +29,7 @@ if __name__ == "__main__":
     parser.add_argument("-multiple_run_config", type=str)
     parser.add_argument("-grid_search_config", type=str)
     parser.add_argument("-grid_search_config2", type=str)
+    parser.add_argument("-grid_search_config3", type=str)
     parser.add_argument("-run_dir", type=str)
 
     parser.add_argument("-n_gpus", type=int, default=4)
@@ -51,6 +52,9 @@ if __name__ == "__main__":
 
     if args.grid_search_config2:
         configs.extend(create_grid_search_config(args.grid_search_config2))
+
+    if args.grid_search_config3:
+        configs.extend(create_grid_search_config(args.grid_search_config3))
 
     if args.run_dir:
         configs.extend(read_run_directory_again(args.run_dir))

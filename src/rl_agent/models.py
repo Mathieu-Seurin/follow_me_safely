@@ -7,6 +7,7 @@ import torch.nn.functional as F
 import numpy as np
 
 import gym
+from rl_agent.gpu_utils import TORCH_DEVICE
 
 class FullyConnectedModel(nn.Module):
     def __init__(self, config, n_action, state_dim):
@@ -28,11 +29,12 @@ class FullyConnectedModel(nn.Module):
         return x
 
 class ConvModel(nn.Module):
-    def __init__(self, config, n_action, state_dim):
+    def __init__(self, config, n_action, state_dim, learn_feedback_classif):
 
         super().__init__()
 
-        self.output_size = n_action.n
+        self.n_action = n_action.n
+        self.output_size = self.n_action
         self.n_hidden_mlp = config["n_mlp_hidden"]
 
         if isinstance(state_dim, gym.spaces.Box):
@@ -73,12 +75,31 @@ class ConvModel(nn.Module):
         self.hidden_layer = nn.Linear(size_to_fc, self.n_hidden_mlp)
         self.output_layer = nn.Linear(self.n_hidden_mlp, self.output_size)
 
+        if learn_feedback_classif:
+            num_class = 2 # Feedback or not
+            self.classif_layer = nn.Linear(self.n_hidden_mlp+self.n_action, num_class)
+
     def forward(self, x):
 
         #x = x['state']
+        self.last_x = x # To check when using compute_classif
+
         x = self.conv_layers(x)
         x = x.view(x.size(0), -1)
-        x = F.relu(self.hidden_layer(x))
-        x = self.output_layer(x)
+        self.last_activation_before_output = F.relu(self.hidden_layer(x))
+        output = self.output_layer(self.last_activation_before_output)
+        return output
 
-        return x
+    def compute_classif_forward(self, states, actions):
+
+        assert torch.all(states == self.last_x)
+        batch_size = self.last_x.size(0)
+
+        # In your for loop
+        action_onehot = torch.zeros(batch_size, self.n_action).to(TORCH_DEVICE)
+        action_onehot.scatter_(1, actions, 1)
+
+        states = torch.cat([self.last_activation_before_output, action_onehot], dim=1)
+        logits = self.classif_layer(states)
+
+        return logits

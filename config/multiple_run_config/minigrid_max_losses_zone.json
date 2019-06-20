@@ -4,10 +4,11 @@
 
   "dqn_params": {
 
-    "learning_rate": [5e-4, 1e-3, 1e-4],
-    "update_every_n_ep" : [5, 20, 2, 10],
+    "learning_rate": [5e-4, 1e-4],
+    "update_every_n_ep" : [20, 40],
 
-    "classification_margin" : [0, 0.01, 0.1, 1],
-    "classification_max_loss_weight" : [0.0001, 0.001, 0.01, 0.1, 0.2, 0.5, 1]
+    "nudging_margin" : [0, 0.01, 0.1, 1],
+    "nudging_loss_weight" : [0.001, 0.01, 0.1, 0.2, 0.5, 1],
+    "nudging_type" : ["max"]
   }
 }

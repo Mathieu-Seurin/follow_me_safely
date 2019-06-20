@@ -7,8 +7,8 @@
     "learning_rate": [5e-4, 1e-4],
     "update_every_n_ep" : [20, 40],
 
-    "nudging_margin" : [0.95, 0.90, 0.80, 0.70, 0.60, 0.50, 0.40, 0.10],
-    "nudging_loss_weight" : [0.001, 0.01, 0.1, 0.5, 1],
-    "nudging_type" : ["percent"]
+    "nudging_margin" : [0, 0.01, 0.1, 1],
+    "nudging_loss_weight" : [0.001, 0.01, 0.1, 0.2, 0.5, 1],
+    "nudging_type" : ["min"]
   }
 }

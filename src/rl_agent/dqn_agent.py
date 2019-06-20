@@ -1,5 +1,5 @@
 from rl_agent.agent_utils import Transition, ReplayMemory, ProportionReplayMemory, \
-    feedback_bad_to_min_when_max, consistency_loss_dqfd, feedback_bad_to_percent_max
+    feedback_bad_to_min_when_max, consistency_loss_dqfd, feedback_bad_to_percent_max, feedback_bad_to_min, feedback_frontier_margin
 
 import torch
 import torch.nn.functional as F
@@ -12,6 +12,8 @@ from rl_agent.gpu_utils import TORCH_DEVICE
 
 import tensorboardX
 
+from sklearn.metrics import f1_score, accuracy_score
+
 class DQNAgent(object):
 
     def __init__(self, config, n_action, state_dim, discount_factor, writer=None, log_stats_every=1e4):
@@ -21,6 +23,9 @@ class DQNAgent(object):
 
         self.q_loss_logger = []
         self.feedback_loss_logger = []
+        self.percent_feedback_logger = []
+        self.supervised_score_logger = []
+        self.random_score_logger = []
 
         self.discount_factor = discount_factor
         self.n_action = n_action.n
@@ -28,6 +33,8 @@ class DQNAgent(object):
         self.lr = config["learning_rate"]
         self.weight_decay = config["weight_decay"]
         self.batch_size = config["batch_size"]
+        self.clip_grad = config["clip_grad"]
+        self.q_loss_weight = config["q_loss_weight"]
 
         if config["feedback_percentage_in_buffer"] == 0: # no proportionnal, use classical replay buffer
             self.memory = ReplayMemory(config["memory_size"])
@@ -42,18 +49,34 @@ class DQNAgent(object):
 
         # ============ LOSSES : Bellman, feedback, regularization ========
         # ================================================================
-        self.regression_loss = F.mse_loss
+        if config["regression_loss_func"] == "l2":
+            self.regression_loss = F.mse_loss
+        elif config["regression_loss_func"] == "l1":
+            self.regression_loss = F.smooth_l1_loss
+        else:
+            raise NotImplementedError("Wrong regression loss func, is {}".format(config["regression_loss_func"]))
 
-        # Use the feedback from the environment (aka : "Don't do this anymore!")
-        self.use_max_feedback_loss = config["classification_max_loss_weight"] > 0
-        if self.use_max_feedback_loss:
-            self.classification_margin = config["classification_margin"]
-            self.classification_max_loss_weight = config["classification_max_loss_weight"]
+        self.use_nudging_loss = config["nudging_loss_weight"] > 0
+        if self.use_nudging_loss:
 
-        self.use_percent_feedback_loss = config["classification_percent_loss_weight"] > 0
-        if self.use_percent_feedback_loss :
-            self.percent_classification_margin = config["percent_classification_margin"]
-            self.classification_percent_loss_weight = config["classification_percent_loss_weight"]
+            self.nudging_loss_weight = config["nudging_loss_weight"]
+            self.nudging_loss_margin = config["nudging_margin"]
+
+            loss_type = config["nudging_type"]
+            if loss_type == "max":
+                self.nudging_loss = feedback_bad_to_min_when_max
+            elif loss_type == "min":
+                self.nudging_loss = feedback_bad_to_min
+            elif loss_type == "percent":
+                self.nudging_loss = feedback_bad_to_percent_max
+            elif loss_type == "frontier":
+                self.nudging_loss = feedback_frontier_margin
+            else:
+                raise NotImplementedError("Wrong nudging loss, {}".format(loss_type))
+
+        self.use_supervised_loss = config["supervised_loss_weight"] > 0
+        if self.use_supervised_loss:
+            self.supervised_loss_weight = config["supervised_loss_weight"]
 
         # Temporal Consistency loss : see https://arxiv.org/pdf/1805.11593.pdf
         # To avoid over generalization
@@ -67,10 +90,11 @@ class DQNAgent(object):
 
         Model = FullyConnectedModel if config["model_type"] == "fc" else ConvModel
 
-        self.policy_net = Model(config["model_params"], n_action=n_action, state_dim=state_dim).to(TORCH_DEVICE)
-        self.target_net = Model(config["model_params"], n_action=n_action, state_dim=state_dim).to(TORCH_DEVICE)
+        self.policy_net = Model(config["model_params"], n_action=n_action, state_dim=state_dim,
+                                learn_feedback_classif=self.use_supervised_loss).to(TORCH_DEVICE)
+        self.target_net = Model(config["model_params"], n_action=n_action, state_dim=state_dim,
+                                learn_feedback_classif=self.use_supervised_loss).to(TORCH_DEVICE)
         self.target_net.load_state_dict(self.policy_net.state_dict())
-
         self.target_net.eval()
 
         self.optimizer = torch.optim.RMSprop(self.policy_net.parameters(), lr=self.lr, weight_decay=self.weight_decay)
@@ -147,6 +171,16 @@ class DQNAgent(object):
             self.target_net.load_state_dict(self.policy_net.state_dict())
             self.num_update_target += 1
 
+    def auxiliary_classification_loss(self, state_batch, action_batch, feedback_batch):
+
+        logits = self.policy_net.compute_classif_forward(states=state_batch,
+                                                         actions=action_batch)
+
+        feedback_batch_label = feedback_batch.detach().long()
+        loss = F.nll_loss(logits, feedback_batch_label)
+        return loss, logits
+
+
     def optimize(self, total_iter):
         if len(self.memory) < self.batch_size:
             if self.summary_writer and total_iter % self.log_stats_every == 0:
@@ -177,6 +211,26 @@ class DQNAgent(object):
         # for each batch state according to policy_net
         state_values = self.policy_net(state_batch)
 
+        supervised_feedback_loss_weighted = 0
+        if self.use_supervised_loss:
+            supervised_loss, logits = self.auxiliary_classification_loss(state_batch=state_batch,
+                                                                         action_batch=action_batch,
+                                                                         feedback_batch=feedback_batch)
+
+            supervised_feedback_loss_weighted = supervised_loss * self.supervised_loss_weight
+
+            output_class = torch.max(logits.cpu(), dim=1)[1]
+            supervised_score = f1_score(y_true=feedback_batch.cpu(), y_pred=output_class)
+
+
+            mean = feedback_batch.mean().item()
+            y_pred = np.random.choice([0,1], p=[1-mean, mean], size=(feedback_batch.size()))
+            random_f1 = f1_score(y_true=feedback_batch.cpu(), y_pred=y_pred)
+
+            self.supervised_score_logger.append(supervised_score)
+            self.random_score_logger.append(random_f1)
+
+
         state_action_values = state_values.gather(1, action_batch)
 
         # Compute V(s_{t+1}) for all next states.
@@ -206,26 +260,16 @@ class DQNAgent(object):
         assert state_action_values.size() == expected_state_action_values.size()
         q_loss = F.smooth_l1_loss(state_action_values, expected_state_action_values)
 
-        feedback_loss_weighted = 0
+        nudging_loss_weighted = 0
+        if self.use_nudging_loss:
+            nudging_loss = self.nudging_loss(qs=state_values,
+                                             action=action_batch,
+                                             feedback=feedback_batch,
+                                             margin=self.nudging_loss_margin,
+                                             regression_loss=self.regression_loss
+                                             )
 
-        if self.use_max_feedback_loss:
-            feedback_loss = feedback_bad_to_min_when_max(qs=state_values,
-                                               action=action_batch,
-                                               feedback=feedback_batch,
-                                               margin=self.classification_margin,
-                                               regression_loss=self.regression_loss)
-
-            feedback_loss_weighted += feedback_loss * self.classification_max_loss_weight
-
-        if self.use_percent_feedback_loss:
-
-            assert feedback_loss_weighted == 0, "Cannot use 2 losses at the same time, should be 0"
-            feedback_loss = feedback_bad_to_percent_max(qs=state_values,
-                                                        action=action_batch,
-                                                        feedback=feedback_batch,
-                                                        regression_loss=self.regression_loss,
-                                                        max_margin=self.percent_classification_margin)
-            feedback_loss_weighted += feedback_loss * self.classification_percent_loss_weight
+            nudging_loss_weighted = nudging_loss * self.nudging_loss_weight
 
         if self.use_consistency_loss_dfqd:
             next_state_values_ref = next_state_action_values
@@ -237,7 +281,7 @@ class DQNAgent(object):
             consistency_loss_weighted = 0
 
         # Compute the sum of all losses
-        loss = q_loss + feedback_loss_weighted + consistency_loss_weighted
+        loss = q_loss * self.q_loss_weight + nudging_loss_weighted + consistency_loss_weighted + supervised_feedback_loss_weighted
 
         # Optimize the model
         self.optimizer.zero_grad()
@@ -245,30 +289,43 @@ class DQNAgent(object):
 
         #old_params = deepcopy(self.policy_net.state_dict())
 
-        for param in self.policy_net.parameters():
-            param.grad.data.clamp_(-1, 1)
-        self.optimizer.step()
+        if self.clip_grad:
+            for param in self.policy_net.parameters():
+                param.grad.data.clamp_(-1, 1)
+            self.optimizer.step()
 
         try:
-            feedback_loss_weighted = feedback_loss_weighted.item()
+            nudging_loss_weighted = nudging_loss_weighted.item()
         except AttributeError:
-            feedback_loss_weighted = 0
+            nudging_loss_weighted = 0
 
         # feedback_loss_weighted = feedback_loss_weighted.item() if isinstance(feedback_loss_weighted,
         #                                                                      torch.Tensor) else 0
 
-        self.feedback_loss_logger.append(feedback_loss_weighted)
+        self.feedback_loss_logger.append(nudging_loss_weighted)
         self.q_loss_logger.append(q_loss.item())
+        self.percent_feedback_logger.append(feedback_batch.mean().item())
 
         if self.summary_writer and total_iter % self.log_stats_every == 0:
             self.summary_writer.add_scalar("data/feedback_loss", np.mean(self.feedback_loss_logger), total_iter)
             self.summary_writer.add_scalar("data/q_loss", np.mean(self.q_loss_logger), total_iter)
-            # self.summary_writer.add_scalar("data/feedback_percentage_in_buffer", feedback_batch.mean().item(), self.num_optim_dqn)
+            self.summary_writer.add_scalar("data/feedback_percentage_in_buffer", np.mean(self.percent_feedback_logger), self.num_optim_dqn)
+
             # self.summary_writer.add_histogram("data/reward_in_batch_replay_buffer", reward_batch.detach().cpu().numpy(), self.num_update, bins=4)
             # self.summary_writer.add_histogramm("data/q_values", state_values.mean, self.num_update, bins=4)
 
+            if self.use_supervised_loss:
+                self.summary_writer.add_scalar("data/supervised_f1_score",
+                                               np.mean(self.supervised_score_logger), total_iter)
+
+                self.summary_writer.add_scalar("data/random_f1_score",
+                                               np.mean(self.random_score_logger), total_iter)
+
+            self.supervised_score_logger = []
             self.feedback_loss_logger = []
             self.q_loss_logger = []
+            self.percent_feedback_logger = []
+            self.random_score_logger = []
 
         self.num_optim_dqn += 1
 

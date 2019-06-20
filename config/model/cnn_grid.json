@@ -14,7 +14,7 @@
       "kernel_size" : [2,2,2],
       "pooling" : [2],
 
-      "n_mlp_hidden" : 64,
+      "n_mlp_hidden" : 256,
       "use_memory" : false
 
     },
@@ -27,7 +27,7 @@
     "learning_rate": 5e-4,
     "weight_decay" : 0,
 
-    "batch_size": 128,
+    "batch_size": 256,
 
     "exploration_method": {
       "name" : "eps_greedy",
@@ -41,17 +41,20 @@
 
     "update_every_n_ep" : 40,
 
+    "clip_grad" : true,
     "apply_loss_to_target" : false,
 
     "consistency_loss_weight" : 0,
 
-    "classification_margin" : 0,
+    "regression_loss_func" : "l1",
 
-    "classification_loss_weight" : 0,
-    "classification_max_loss_weight" : 0,
+    "q_loss_weight" : 0,
 
-    "percent_classification_margin" : 0,
-    "classification_percent_loss_weight" : 0
+    "nudging_margin" : 0,
+    "nudging_loss_weight" : 0,
+    "nudging_type" : "none",
+
+    "supervised_loss_weight" : 0
 
   }
 }
