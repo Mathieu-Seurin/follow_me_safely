@@ -99,13 +99,13 @@ class DQNAgent(object):
 
         self.optimizer = torch.optim.RMSprop(self.policy_net.parameters(), lr=self.lr, weight_decay=self.weight_decay)
 
-        if config["exploration_method"]["name"] == "eps_greedy":
+        if config["exploration_method"] == "eps_greedy":
 
             self.select_action = self._select_action_eps_greedy
-            self.epsilon_init = config["exploration_method"]["begin_eps"]
+            self.epsilon_init = config["exploration_params"]["begin_eps"]
             self.current_eps = copy(self.epsilon_init)
-            self.expected_exploration_steps = config["exploration_method"]["expected_step_explo"]
-            self.minimum_epsilon = config["exploration_method"]["epsilon_minimum"]
+            self.expected_exploration_steps = config["exploration_params"]["expected_step_explo"]
+            self.minimum_epsilon = config["exploration_params"]["epsilon_minimum"]
             self.n_step_eps = 0
 
             self.biased_sampling = config["biased_sampling"]
@@ -118,8 +118,15 @@ class DQNAgent(object):
                 self.action_proba = np.ones(self.n_action)
                 self.action_proba /= np.sum(self.action_proba)
 
-        else:
-            raise NotImplementedError("Boltzman explo not available ({})".format(config["exploration_method"]["name"]))
+        elif config["exploration_method"] == "boltzmann" :
+
+            self.select_action = self._select_action_boltzmann
+            self.epsilon_init = config["exploration_params"]["begin_eps"]
+            self.current_eps = copy(self.epsilon_init)
+            self.expected_exploration_steps = config["exploration_params"]["expected_step_explo"]
+            self.minimum_epsilon = config["exploration_params"]["epsilon_minimum"]
+            self.n_step_eps = 0
+
 
         self.summary_writer = writer
 
@@ -160,6 +167,18 @@ class DQNAgent(object):
         else:
             act = np.random.choice(self.n_action, p=self.action_proba)
             return torch.tensor([[act]], dtype=torch.long)
+
+    def _select_action_boltzmann(self, state):
+
+        q = self.get_q_values(state)
+        p = torch.nn.functional.softmax(q / self.current_eps, dim=1).view(-1)
+        act = np.random.choice(self.n_action, p=p.cpu().type(torch.float16).numpy())
+
+        self.current_eps = max(self.minimum_epsilon, self.epsilon_init * np.exp(
+            - 2.5 * self.n_step_eps / self.expected_exploration_steps))
+        self.n_step_eps += 1
+
+        return torch.tensor([[act]], dtype=torch.long)
 
 
     def push(self, *args):

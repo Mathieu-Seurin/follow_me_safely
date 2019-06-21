@@ -29,13 +29,14 @@
 
     "batch_size": 256,
 
-    "exploration_method": {
-      "name" : "eps_greedy",
+    "exploration_method": "eps_greedy" ,
+
+     "exploration_params" :
+     {
       "begin_eps" : 1,
       "expected_step_explo" : 30000,
       "epsilon_minimum" : 0.04
-
-    },
+     },
 
     "biased_sampling" : false,
 
@@ -48,7 +49,7 @@
 
     "regression_loss_func" : "l1",
 
-    "q_loss_weight" : 0,
+    "q_loss_weight" : 1,
 
     "nudging_margin" : 0,
     "nudging_loss_weight" : 0,

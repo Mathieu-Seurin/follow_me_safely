@@ -337,8 +337,8 @@ def feedback_frontier_margin(qs, action, feedback, margin, regression_loss, test
     qs_a_where_bad = qs_a[feedback == 1]
 
     # Compute frontier with margin
-    min_good = torch.Tensor([-2]) #torch.min(qs_a_where_good) - margin
-    max_bad = torch.tensor([2])  #torch.max(qs_a_where_bad) + margin
+    min_good = torch.tensor([-1]) #torch.min(qs_a_where_good) - margin
+    max_bad = torch.max(qs_a_where_bad) + margin
 
     min_good = min_good.item()
     max_bad = max_bad.item()

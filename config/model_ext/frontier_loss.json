@@ -1,5 +1,5 @@
 {
-  "name" : "strong_frontier_batch_lr_test_small_decay_no_clip",
+  "name" : "strong_frontier_batch_eps_test_margin1",
 
   "dqn_params" : {
     "learning_rate" : 1e-4,
@@ -10,14 +10,15 @@
 
     "clamp_grad" : false,
 
+    "q_loss_weight" : 1,
+
     "batch_size" : 512,
     "weight_decay" : 0,
 
-    "exploration_method": {
+    "exploration_params": {
       "begin_eps" : 1,
-      "expected_step_explo" : 2000,
-      "epsilon_minimum" : 0.01
-
+      "expected_step_explo" : 5000,
+      "epsilon_minimum" : 0.02
     },
 
     "supervised_loss_weight" : 0
