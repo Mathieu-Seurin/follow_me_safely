@@ -35,6 +35,7 @@ class DQNAgent(object):
         self.batch_size = config["batch_size"]
         self.clip_grad = config["clip_grad"]
         self.q_loss_weight = config["q_loss_weight"]
+        self.boostrap_feedback = config["boostrap_feedback"]
 
         if config["feedback_percentage_in_buffer"] == 0: # no proportionnal, use classical replay buffer
             self.memory = ReplayMemory(config["memory_size"])
@@ -212,17 +213,23 @@ class DQNAgent(object):
         # to Transition of batch-arrays.
         batch = Transition(*zip(*transitions))
 
-        # Compute a mask of non-final states and concatenate the batch elements
-        # (a final state would've been the one after which simulation ended)
-        non_final_mask = torch.tensor(tuple(map(lambda s: s is not None,
-                                              batch.next_state)), device=TORCH_DEVICE, dtype=torch.uint8)
-        non_final_next_states = torch.cat([s for s in batch.next_state
-                                                    if s is not None]).to(TORCH_DEVICE)
-
         state_batch = torch.cat(batch.state).to(TORCH_DEVICE)
         action_batch = torch.cat(batch.action).to(TORCH_DEVICE)
         reward_batch = torch.cat(batch.reward).to(TORCH_DEVICE)
         feedback_batch = torch.cat(batch.gave_feedback).to(TORCH_DEVICE)
+
+        # Compute a mask of non-final states and concatenate the batch elements
+        # (a final state would've been the one after which simulation ended)
+        non_final_mask = torch.tensor(tuple(map(lambda s: s is not None,
+                                                batch.next_state)), device=TORCH_DEVICE, dtype=torch.uint8)
+
+        if not self.boostrap_feedback:
+            no_feed_batch = feedback_batch == 0
+            non_final_mask = non_final_mask * no_feed_batch
+
+        non_final_next_states = torch.cat([s for i, s in enumerate(batch.next_state)
+                                           if s is not None and non_final_mask[i]]).to(TORCH_DEVICE)
+
 
         # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
         # columns of actions taken. These are the actions which would've been taken

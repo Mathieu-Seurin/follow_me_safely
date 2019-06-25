@@ -78,6 +78,32 @@ class ProportionReplayMemory(object):
         return len(self.memory)+len(self.memory_feedback)
 
 
+def orthogonal(tensor, gain=1):
+    if tensor.ndimension() < 2:
+        raise ValueError("Only tensors with 2 or more dimensions are supported")
+
+    rows = tensor.size(0)
+    cols = tensor[0].numel()
+    flattened = torch.Tensor(rows, cols).normal_(0, 1)
+
+    if rows < cols:
+        flattened.t_()
+
+    # Compute the qr factorization
+    q, r = torch.qr(flattened)
+    # Make Q uniform according to https://arxiv.org/pdf/math-ph/0609050.pdf
+    d = torch.diag(r, 0)
+    ph = d.sign()
+    q *= ph.expand_as(q)
+
+    if rows < cols:
+        q.t_()
+
+    tensor.view_as(q).copy_(q)
+    tensor.mul_(gain)
+    return tensor
+
+
 def freeze_as_np_dict(tensor_dict):
     out = {}
     for key in tensor_dict.keys():

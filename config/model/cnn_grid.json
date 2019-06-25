@@ -49,6 +49,8 @@
 
     "regression_loss_func" : "l1",
 
+    "boostrap_feedback" : true,
+
     "q_loss_weight" : 1,
 
     "nudging_margin" : 0,
