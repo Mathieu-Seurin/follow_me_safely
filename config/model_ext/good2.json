@@ -1,0 +1,12 @@
+{
+  "name" : "feedback_percentage_in_buffer:0-learning_rate:0.001-update_every_n_ep:2-classification_margin:0.01-classification_max_loss_weight:0.01",
+
+  "dqn_params" :
+  {
+    "feedback_percentage_in_buffer":0,
+    "learning_rate" : 0.001,
+    "update_every_n_ep" : 2,
+    "classification_margin" :0.01,
+    "classification_max_loss_weight" :0.01
+  }
+}

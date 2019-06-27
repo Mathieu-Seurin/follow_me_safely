@@ -338,8 +338,8 @@ def feedback_bad_to_percent_max(qs, action, feedback, margin, regression_loss):
     assert max_qs_and_margin.size() == qs_a_where_bad.size(), \
         "Problem in loss, size 1 {}  size 2 : {}".format(max_qs_and_margin.size(), qs_a_where_bad.size())
 
-    assert max_qs_and_margin.requires_grad == False
-    assert qs_a_where_bad.requires_grad == True
+    assert max_qs_and_margin.requires_grad is False
+    assert qs_a_where_bad.requires_grad is True
 
     loss = regression_loss(max_qs_and_margin, qs_a_where_bad) # Bring bad action down under margin
     return loss
@@ -363,7 +363,7 @@ def feedback_frontier_margin(qs, action, feedback, margin, regression_loss, test
     qs_a_where_bad = qs_a[feedback == 1]
 
     # Compute frontier with margin
-    min_good = torch.tensor([-1]) #torch.min(qs_a_where_good) - margin
+    min_good = torch.min(qs_a_where_good) - margin
     max_bad = torch.max(qs_a_where_bad) + margin
 
     min_good = min_good.item()

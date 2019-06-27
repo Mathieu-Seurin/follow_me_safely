@@ -1,98 +1,141 @@
-import torch.nn as nn
+from rl_agent.agent_utils import Transition, ReplayMemory, ProportionReplayMemory
+
+import torch
 import torch.nn.functional as F
 
-class Categorical(nn.Module):
-    def __init__(self, num_inputs, num_outputs):
-        super(Categorical, self).__init__()
-        self.linear = nn.Linear(num_inputs, num_outputs)
+from rl_agent.models import ConvACModel, FCACModel
+import numpy as np
+from copy import copy, deepcopy
 
-    def forward(self, x):
-        x = self.linear(x)
-        return x
+from rl_agent.gpu_utils import TORCH_DEVICE
 
-    def sample(self, x, deterministic):
-        x = self(x)
+import tensorboardX
 
-        probs = F.softmax(x)
-        if deterministic is False:
-            action = probs.multinomial()
+from sklearn.metrics import f1_score, accuracy_score
+
+class ACAgent(object):
+
+    def __init__(self, config, n_action, state_dim, discount_factor, writer=None, log_stats_every=1e4):
+
+        self.save_config = config
+        self.log_stats_every = log_stats_every
+
+        self.q_loss_logger = []
+        self.feedback_loss_logger = []
+        self.percent_feedback_logger = []
+        self.supervised_score_logger = []
+        self.random_score_logger = []
+
+        self.discount_factor = discount_factor
+        self.n_action = n_action.n
+
+        self.lr = config["learning_rate"]
+        self.weight_decay = config["weight_decay"]
+        self.batch_size = config["batch_size"]
+        self.clip_grad = config["clip_grad"]
+        self.q_loss_weight = config["q_loss_weight"]
+        self.boostrap_feedback = config["boostrap_feedback"]
+
+        # ============ LOSSES : Bellman, feedback, regularization ========
+        # ================================================================
+        if config["regression_loss_func"] == "l2":
+            self.regression_loss = F.mse_loss
+        elif config["regression_loss_func"] == "l1":
+            self.regression_loss = F.smooth_l1_loss
         else:
-            action = probs.max(1)[1]
-        return action
+            raise NotImplementedError("Wrong regression loss func, is {}".format(config["regression_loss_func"]))
 
-    def logprobs_and_entropy(self, x, actions):
-        x = self(x)
+        self.use_supervised_loss = config["supervised_loss_weight"] > 0
+        if self.use_supervised_loss:
+            self.supervised_loss_weight = config["supervised_loss_weight"]
 
-        log_probs = F.log_softmax(x)
-        probs = F.softmax(x)
+        # ========== Model ===============
 
-        action_log_probs = log_probs.gather(1, actions)
+        Model = FCACModel if config["model_type"] == 'fc' else ConvACModel
 
-        dist_entropy = -(log_probs * probs).sum(-1).mean()
-        return action_log_probs, dist_entropy
-
-
-def weights_init(m):
-    classname = m.__class__.__name__
-    if classname.find('Conv') != -1 or classname.find('Linear') != -1:
-        orthogonal(m.weight.data)
-        if m.bias is not None:
-            m.bias.data.fill_(0)
+        self.policy_net = Model(config["model_params"], n_action=n_action, state_dim=state_dim,
+                                learn_feedback_classif=self.use_supervised_loss).to(TORCH_DEVICE)
 
 
-class CNNPolicy(nn.Module):
-    def __init__(self, num_inputs, action_space):
-        super(CNNPolicy, self).__init__()
-        self.conv1 = nn.Conv2d(num_inputs, 32, 8, stride=4)
-        self.conv2 = nn.Conv2d(32, 64, 4, stride=2)
-        self.conv3 = nn.Conv2d(64, 32, 3, stride=1)
+        self.optimizer = torch.optim.RMSprop(self.policy_net.parameters(), lr=self.lr, weight_decay=self.weight_decay)
 
-        self.linear1 = nn.Linear(32 * 7 * 7, 512)
 
-        self.critic_linear = nn.Linear(512, 1)
+        if config["exploration_method"] == "boltzmann" :
+            pass
 
-        num_outputs = action_space.n
-        self.dist = Categorical(512, num_outputs)
 
-        self.train()  # training mode. Only affects dropout, batchnorm etc
-        self.reset_parameters()
+        self.summary_writer = writer
 
-    def act(self, inputs, states, masks, deterministic=False):
-        value, x, states = self(inputs, states, masks)
-        action = self.dist.sample(x, deterministic=deterministic)
-        action_log_probs, dist_entropy = self.dist.logprobs_and_entropy(x, action)
-        return value, action, action_log_probs, states
+    def act(self, state):
 
-    def evaluate_actions(self, inputs, states, masks, actions):
-        value, x, states = self(inputs, states, masks)
-        action_log_probs, dist_entropy = self.dist.logprobs_and_entropy(x, actions)
-        return value, action_log_probs, dist_entropy, states
+        if np.random.random() > 0.01:
+            with torch.no_grad():
+                # t.max(1) will return largest column value of each row.
+                # second column on max result is index of where max element was
+                # found, so we pick action with the larger expected reward.
+                qs = self.policy_net(state.to(TORCH_DEVICE))
+                return qs.max(1)[1].view(1, 1).to('cpu')
+        else:
+            return torch.tensor([[np.random.randint(self.n_action)]], dtype=torch.long)
 
-    @property
-    def state_size(self):
-        return 1
+    def get_q_values(self, state):
+        with torch.no_grad():
+            # t.max(1) will return largest column value of each row.
+            # second column on max result is index of where max element was
+            # found, so we pick action with the larger expected reward.
+            qs = self.policy_net(state.to(TORCH_DEVICE))
+            return qs
 
-    def reset_parameters(self):
-        self.apply(weights_init)
 
-        relu_gain = nn.init.calculate_gain('relu')
-        self.conv1.weight.data.mul_(relu_gain)
-        self.conv2.weight.data.mul_(relu_gain)
-        self.conv3.weight.data.mul_(relu_gain)
-        self.linear1.weight.data.mul_(relu_gain)
+    def push(self, *args):
+        self.memory.push(*args)
 
-    def forward(self, inputs, states, masks):
-        x = self.conv1(inputs / 255.0)
-        x = F.relu(x)
+    def callback(self, epoch):
 
-        x = self.conv2(x)
-        x = F.relu(x)
+        if epoch % self.update_every_n_ep == 0:
+            self.target_net.load_state_dict(self.policy_net.state_dict())
+            self.num_update_target += 1
 
-        x = self.conv3(x)
-        x = F.relu(x)
 
-        x = x.view(-1, 32 * 7 * 7)
-        x = self.linear1(x)
-        x = F.relu(x)
+    def optimize(self, total_iter):
 
-        return self.critic_linear(x), x, states
+        # Compute Huber loss
+        q_loss = 0
+
+        # Optimize the model
+        self.optimizer.zero_grad()
+        q_loss.backward()
+
+        #old_params = deepcopy(self.policy_net.state_dict())
+
+        if self.clip_grad:
+            for param in self.policy_net.parameters():
+                param.grad.data.clamp_(-1, 1)
+
+        self.optimizer.step()
+
+
+        if self.summary_writer and total_iter % self.log_stats_every == 0:
+            self.summary_writer.add_scalar("data/feedback_loss", np.mean(self.feedback_loss_logger), total_iter)
+            self.summary_writer.add_scalar("data/q_loss", np.mean(self.q_loss_logger), total_iter)
+            self.summary_writer.add_scalar("data/feedback_percentage_in_buffer", np.mean(self.percent_feedback_logger), self.num_optim)
+
+            # self.summary_writer.add_histogram("data/reward_in_batch_replay_buffer", reward_batch.detach().cpu().numpy(), self.num_update, bins=4)
+            # self.summary_writer.add_histogramm("data/q_values", state_values.mean, self.num_update, bins=4)
+
+            if self.use_supervised_loss:
+                self.summary_writer.add_scalar("data/supervised_f1_score",
+                                               np.mean(self.supervised_score_logger), total_iter)
+
+                self.summary_writer.add_scalar("data/random_f1_score",
+                                               np.mean(self.random_score_logger), total_iter)
+
+            self.supervised_score_logger = []
+            self.feedback_loss_logger = []
+            self.q_loss_logger = []
+            self.percent_feedback_logger = []
+            self.random_score_logger = []
+
+        self.num_optim += 1
+
+        #check_params_changed(old_params, self.policy_net.state_dict())

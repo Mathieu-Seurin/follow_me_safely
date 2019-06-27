@@ -1,0 +1,12 @@
+{
+  "name" : "learning_rate:0.0005-update_every_n_ep:2-percent_classification_margin:0.95-classification_percent_loss_weight:0.01",
+
+  "dqn_params" :
+  {
+    "learning_rate" : 0.0005,
+    "update_every_n_ep" : 2,
+    "percent_classification_margin" : 0.95,
+    "classification_percent_loss_weight" : 0.01
+  }
+
+}

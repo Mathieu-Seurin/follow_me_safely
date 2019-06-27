@@ -103,3 +103,12 @@ class ConvModel(nn.Module):
         logits = self.classif_layer(states)
 
         return logits
+
+
+class ConvACModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+class FCACModel(nn.Module):
+    def __init__(self):
+        super().__init__()

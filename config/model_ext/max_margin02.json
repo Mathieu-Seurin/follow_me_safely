@@ -1,0 +1,8 @@
+{
+  "name": "max_margin0.2",
+
+  "dqn_params" : {
+    "classification_margin" : 0.2,
+    "classification_max_loss_weight" : 1
+  }
+}

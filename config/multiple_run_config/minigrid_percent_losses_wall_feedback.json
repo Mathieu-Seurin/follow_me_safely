@@ -1,0 +1,13 @@
+{
+  "model_config" : "cnn_grid.json",
+  "env_config" : "safe_minigrid_7_more_feedback.json",
+
+  "dqn_params": {
+
+    "learning_rate": [5e-4, 1e-3, 1e-4],
+    "update_every_n_ep" : [20, 2, 10, 5],
+
+    "percent_classification_margin" : [0.99, 0.97, 0.95, 0.90, 0.80, 0.70],
+    "classification_percent_loss_weight" : [0.0001, 0.001, 0.01, 0.1, 0.5, 1]
+  }
+}

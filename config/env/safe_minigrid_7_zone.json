@@ -1,5 +1,5 @@
 {
-  "name": "Minigrid-safe-size7_zone10",
+  "name": "Minigrid-safe-size7_zone3",
 
   "size_env" : 7,
   "n_frameskip" : 3,
@@ -8,10 +8,12 @@
   "reward_when_out" : 0,
   "feedback_when_wall_hit" : 0,
 
-  "n_zone" : 10,
+  "n_zone" : 3,
 
   "good_zone_action_proba" : 1,
   "bad_zone_action_proba" : 0,
+
+  "prevent_bad_action" : true,
 
   "use_lava" : false,
 
@@ -23,7 +25,7 @@
 
   "stop" : {
     "episode_reward_mean" : 0.95,
-    "max_iter_expe" : 150000
+    "max_iter_expe" : 120000
   }
 }
 

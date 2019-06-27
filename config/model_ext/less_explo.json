@@ -1,0 +1,12 @@
+{
+  "name" : "less_explo",
+
+  "dqn_params" : {
+
+    "exploration_params": {
+      "begin_eps" : 1,
+      "expected_step_explo" : 5000,
+      "epsilon_minimum" : 0.02
+    }
+  }
+}

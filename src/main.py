@@ -116,6 +116,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
         good_zone_action_proba = full_config["good_zone_action_proba"]
         bad_zone_action_proba = full_config["bad_zone_action_proba"]
         obstacle_type = full_config["obstacle_type"]
+        prevent_bad_action = full_config["prevent_bad_action"]
 
         game = SafeCrossing(size=size,
                             reward_when_falling=reward_when_falling,
@@ -126,6 +127,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
                             good_zone_action_proba=good_zone_action_proba,
                             bad_zone_action_proba=bad_zone_action_proba,
                             obstacle_type=obstacle_type,
+                            prevent_bad_action=prevent_bad_action,
                             seed=seed)
 
         game = MinigridFrameStacker(game, full_config["n_frameskip"])
@@ -322,10 +324,10 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
 
 
             print("End of ep #{}, n_timesteps (estim) {}, iter_this_ep : {}, current_eps {}, zone {}".format(
-                num_episode, total_iter, np.mean(iter_this_ep_list[-3:]), model.current_eps, state['zone']))
+                num_episode, total_iter, np.mean(iter_this_ep_list[-1]), model.current_eps, state['zone']))
 
-            print("(Estim) Discounted rew : {} undiscounted : {}, n_feedback {} \n\n".format(
-                np.mean(last_reward_discount_list[-3:]), np.mean(last_reward_undiscount_list[-3:]), np.mean(feedback_per_ep_list[-3:])))
+            print("(Estim) Discounted rew : {} undiscounted : {}, unbiaised : {},  n_feedback {} \n\n".format(
+                np.mean(last_reward_discount_list[-1]), np.mean(last_reward_undiscount_list[-1]), reward_wo_feedback_list[-1][0], np.mean(feedback_per_ep_list[-1])))
 
             if reward_total_discounted > score_success:
                 success_count += 1
