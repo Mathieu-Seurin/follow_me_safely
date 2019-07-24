@@ -1,26 +1,23 @@
 {
-  "name" : "strong_frontier_batch_eps_test_margin1",
+  "name" : "frontier_w0.5_m0.1_up40_boltz_less",
 
   "dqn_params" : {
-    "learning_rate" : 1e-4,
+    "learning_rate" : 1e-5,
     "update_every_n_ep" : 40,
-    "nudging_loss_weight" : 1,
-    "nudging_margin" : 1,
+    "nudging_loss_weight" : 0.5,
+    "nudging_margin" : 0.1,
     "nudging_type" : "frontier",
+    "clamp_grad" : true,
+    "batch_size" : 128,
 
-    "clamp_grad" : false,
+    "exploration_method" : "boltzmann",
 
-    "q_loss_weight" : 1,
-
-    "batch_size" : 512,
-    "weight_decay" : 0,
-
-    "exploration_params": {
+     "exploration_params" :
+     {
       "begin_eps" : 1,
-      "expected_step_explo" : 5000,
-      "epsilon_minimum" : 0.02
-    },
+      "expected_step_explo" : 10000,
+      "epsilon_minimum" : 0.005
+     }
 
-    "supervised_loss_weight" : 0
-    }
+  }
 }
