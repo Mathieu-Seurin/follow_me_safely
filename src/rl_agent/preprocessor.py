@@ -19,6 +19,5 @@ def ImagePreprocessor(state):
     return state.to(TORCH_DEVICE)
 
 
-
 def TextPreprocessor(state):
     pass

@@ -270,8 +270,6 @@ class MinigridFrameStacker(gym.Wrapper):
         assert self.observation_space.contains(new_obs), "Problem, observation don't match observation space."
         return new_obs, reward, done, info
 
-
-
 # class ZorkPreproc(gym.Wrapper):
 #     def __init__(self, env):
 #         pass
@@ -315,7 +313,7 @@ class TextWorldPreproc(gym.Wrapper):
         if n_dummy_action:
             self._all_doable_actions = self._all_doable_actions.extend([str(i) for i in range(n_dummy_action)])
 
-        #self.action_space = gym.spaces.Discrete(len(self._all_doable_actions))
+        self.action_space = gym.spaces.Discrete(len(self._all_doable_actions))
 
     @property
     def num_fields(self):
