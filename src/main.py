@@ -10,7 +10,10 @@ import tensorboardX
 import tensorflow as tf
 import numpy as np
 
-import time
+import textworld
+import textworld.gym as tw_gym
+from textworld.envs.wrappers.filter import EnvInfos
+from env_tools.wrapper import TextWorldPreproc
 
 @ray.remote(num_gpus=0.24)
 def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_test, override_expe=True, save_images=False):
@@ -132,6 +135,25 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
 
         game = MinigridFrameStacker(game, full_config["n_frameskip"])
 
+    elif "zork" in full_config['env_name'].lower():
+        raise NotImplementedError("Zork is a pain in the A#%?, i'll do it later")
+        #game = textworld.start('./zork1.z5')
+
+    elif "text" in full_config['env_name'].lower():
+        EXTRA_GAME_INFO = {
+            "inventory": True,
+            "description": True,
+            "intermediate_reward": True,
+            "admissible_commands": True,
+            "policy_commands": True,
+        }
+
+        env_id = tw_gym.register_game("simple1.ulx", max_episode_steps=10,
+                                      name="simple1", request_infos=EnvInfos(**EXTRA_GAME_INFO))
+        game = gym.make(env_id)
+
+        game = TextWorldPreproc(env=game)
+
     else:
         game = gym.make(full_config["env_name"])
 
@@ -160,14 +182,10 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
 
     model_type = full_config["agent_type"]
     if model_type == "dqn" :
-        model = DQNAgent(config=full_config["dqn_params"],
-                         n_action=game.action_space,
-                         state_dim=game.observation_space,
-                         discount_factor=discount_factor,
-                         writer=writer,
-                         log_stats_every=log_stats_every
-                         )
-    else:
+        model = DQNAgent(config=full_config["dqn_params"], action_space=game.action_space,
+                         obs_space=game.observation_space, discount_factor=discount_factor, writer=writer,
+                         log_stats_every=log_stats_every)
+    else :
         raise NotImplementedError("{} not available for model".format(full_config["agent_type"]))
 
     save_images_at = set(full_config["save_images_at"])
@@ -177,8 +195,6 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
         while total_iter < max_iter_expe and not early_stopping :
 
             state = game.reset()
-            state['state'] = torch.FloatTensor(state['state']).unsqueeze(0)
-            state['gave_feedback'] = torch.FloatTensor([state['gave_feedback']])
 
             #game.render('human')
             done = False
@@ -212,17 +228,12 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
                         rendered_images.pop(0)
 
                 action = model.select_action(state['state'])
-                next_state, reward, done, info = game.step(action=action.item())
-
-                reward = torch.FloatTensor([reward])
+                next_state, reward, done, info = game.step(action=action)
 
                 if done:
                     next_state['state'] = None
-                else:
-                    next_state['state'] = torch.FloatTensor(next_state['state']).unsqueeze(0)
-                next_state['gave_feedback'] = torch.FloatTensor([next_state['gave_feedback']])
 
-                model.push(state['state'].to('cpu'), action, next_state['state'], reward, next_state['gave_feedback'])
+                model.push(state['state'], action, next_state['state'], reward, next_state['gave_feedback'])
                 model.optimize(total_iter=total_iter)
 
                 state = next_state
@@ -234,7 +245,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
                 n_feedback_this_ep += info['gave_feedback']
                 self_kill_trial += info['tried_destruct']
 
-                assert max(next_state['gave_feedback']) == info['gave_feedback'], "Problem, info should contain the same info as state"
+                assert next_state['gave_feedback'] == info['gave_feedback'], "Problem, info should contain the same info as state"
 
                 reward_total_discounted += reward * (discount_factor ** iter_this_ep)
                 reward_total_not_discounted += reward
@@ -308,11 +319,11 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
             # Update target network if needed
             model.callback(epoch=num_episode)
 
-            reward_undiscount_list.append(reward_total_not_discounted.item())
-            reward_discount_list.append(reward_total_discounted.item())
+            reward_undiscount_list.append(reward_total_not_discounted)
+            reward_discount_list.append(reward_total_discounted)
 
-            last_reward_undiscount_list.append(reward_total_not_discounted.item())
-            last_reward_discount_list.append(reward_total_discounted.item())
+            last_reward_undiscount_list.append(reward_total_not_discounted)
+            last_reward_discount_list.append(reward_total_discounted)
 
             feedback_per_ep_list.append(n_feedback_this_ep)
             percentage_tile_seen_list.append(percentage_tile_seen)
@@ -327,7 +338,8 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
                 num_episode, total_iter, np.mean(iter_this_ep_list[-1]), model.current_eps, state['zone']))
 
             print("(Estim) Discounted rew : {} undiscounted : {}, unbiaised : {},  n_feedback {} \n\n".format(
-                np.mean(last_reward_discount_list[-1]), np.mean(last_reward_undiscount_list[-1]), reward_wo_feedback_list[-1][0], np.mean(feedback_per_ep_list[-1])))
+                np.mean(last_reward_discount_list[-1]), np.mean(last_reward_undiscount_list[-1]),
+                reward_wo_feedback_list[-1], np.mean(feedback_per_ep_list[-1])))
 
             if reward_total_discounted > score_success:
                 success_count += 1

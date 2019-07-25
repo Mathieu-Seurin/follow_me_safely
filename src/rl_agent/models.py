@@ -10,11 +10,11 @@ import gym
 from rl_agent.gpu_utils import TORCH_DEVICE
 
 class FullyConnectedModel(nn.Module):
-    def __init__(self, config, n_action, state_dim):
+    def __init__(self, config, action_space, obs_space):
         super().__init__()
 
-        self.output_size = n_action.n
-        self.n_input = state_dim.shape[0]
+        self.output_size = action_space.n
+        self.n_input = obs_space.shape[0]
 
         self.n_hidden_mlp = config["n_mlp_hidden"]
 
@@ -28,19 +28,89 @@ class FullyConnectedModel(nn.Module):
 
         return x
 
-class ConvModel(nn.Module):
-    def __init__(self, config, n_action, state_dim, learn_feedback_classif):
+
+class ConvTextModel(nn.Module):
+    def __init__(self, config, action_space, obs_space):
+        pass
+
+
+def order_batch(batch):
+    """
+    Order batch of sequences by sequence len and keep inverse
+    :param batch: list of lists of items
+    :return: Tuple[sorted batch, numpy array to return the order]
+    """
+    lens = list(map(len, batch))
+    ord_idx = np.flip(np.argsort(lens, kind='stable'))
+    ord_inv = np.argsort(ord_idx, kind='stable')
+    ord_batch = [batch[idx] for idx in ord_idx]
+    return ord_batch, ord_inv
+
+class TextModel(nn.Module):
+    def __init__(self, config, action_space, obs_space):
 
         super().__init__()
 
-        self.n_action = n_action.n
+        self.n_input = obs_space.shape[0]
+        self.n_output_size = action_space.n
+
+        vocab_size = obs_space.vocab_size
+        embedding_dim = config["word_embedding_size"]
+
+        self.embedding = nn.Embedding(num_embeddings=vocab_size,
+                                      embedding_dim=embedding_dim)
+
+        self.encoders = dict()
+
+        self.encoders['obs'] = nn.LSTM(input_size=10,
+                                       num_layers=1,
+                                       hidden_size=config["obs_rnn_size"],
+                                       dropout=0,
+                                       bidirectional=config["bidir"],
+                                       batch_first=True)
+
+        self.encoders['inventory'] = nn.LSTM(input_size=10,
+                                             num_layers=1,
+                                             hidden_size=config["inventory_rnn_size"],
+                                             bidirectional=config["bidir"],
+                                             dropout=0,
+                                             batch_first=True)
+
+    def encode_sequences(self, batch_seq):
+
+        sorted_batch_seq, ord_inv_index = order_batch(batch_seq)
+        return None
+
+
+
+    def forward(self, x):
+
+        x = self.embedding(x)
+
+        encoded_inv = self.encode_sequences(x['inventory'])
+        encoded_desc = self.encode_sequences(x['description'])
+
+
+        x = F.relu(self.hidden_layer(x))
+        x = self.out_layer(x)
+        return x
+
+
+
+
+class ConvModel(nn.Module):
+    def __init__(self, config, action_space, obs_space, learn_feedback_classif=False):
+
+        super().__init__()
+
+        self.n_action = action_space.n
         self.output_size = self.n_action
         self.n_hidden_mlp = config["n_mlp_hidden"]
 
-        if isinstance(state_dim, gym.spaces.Box):
-            self.input_shape = state_dim.shape
+        if isinstance(obs_space, gym.spaces.Box):
+            self.input_shape = obs_space.shape
         else:
-            self.input_shape = state_dim.spaces["state"].shape
+            self.input_shape = obs_space.spaces["state"].shape
 
         self.additionnal_input_size = 0
 

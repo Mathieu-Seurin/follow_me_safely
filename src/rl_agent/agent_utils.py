@@ -7,6 +7,7 @@ from rl_agent.gpu_utils import TORCH_DEVICE
 import logging
 
 import matplotlib.pyplot as plt
+import copy
 
 # Transition = namedtuple('Transition',
 #                         ('state', 'action', 'next_state', 'reward'))
@@ -278,7 +279,9 @@ def feedback_bad_to_min(qs, action, feedback, margin, regression_loss):
 
 def render_state_and_q_values(model, game, state):
 
-    q = model.get_q_values(state['state'])
+    processed_state = model.preprocessor(copy.deepcopy(state['state']))
+
+    q = model.get_q_values(processed_state)
     max_action = torch.max(q, dim=1)[1].item()
 
     fig = plt.figure()

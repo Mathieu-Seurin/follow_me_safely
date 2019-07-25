@@ -1,0 +1,11 @@
+{
+  "name": "Text_Zork_base",
+
+  "reward_when_no_action" : 0,
+
+  "stop" : {
+    "max_iter_expe" : 1000,
+    "episode_reward_mean" : 800
+  }
+}
+

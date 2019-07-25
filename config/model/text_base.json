@@ -1,0 +1,62 @@
+{
+  "name": "dqn_for_text",
+
+  "agent_type" : "dqn",
+  "discount_factor": 0.99,
+
+  "dqn_params": {
+
+    "model_type" : "text",
+
+    "model_params": {
+      "rnn_type": "lstm",
+      "word_embedding_size" : 128,
+      "inventory_rnn_size" : 256,
+      "obs_rnn_size" : 256,
+      "bidir": false,
+      "n_mlp_hidden": 256
+    },
+
+
+    "feedback_percentage_in_buffer" : 0,
+    "memory_size": 40000,
+
+    "clamp_grad": true,
+    "optimizer": "rmsprop",
+    "learning_rate": 5e-4,
+    "weight_decay" : 0,
+
+    "batch_size": 256,
+
+    "exploration_method": "eps_greedy" ,
+
+     "exploration_params" :
+     {
+      "begin_eps" : 1,
+      "expected_step_explo" : 30000,
+      "epsilon_minimum" : 0.04
+     },
+
+    "biased_sampling" : false,
+
+    "update_every_n_ep" : 40,
+
+    "clip_grad" : true,
+    "apply_loss_to_target" : false,
+
+    "consistency_loss_weight" : 0,
+
+    "regression_loss_func" : "l1",
+
+    "boostrap_feedback" : true,
+
+    "q_loss_weight" : 1,
+
+    "nudging_margin" : 0,
+    "nudging_loss_weight" : 0,
+    "nudging_type" : "none",
+
+    "supervised_loss_weight" : 0
+
+  }
+}

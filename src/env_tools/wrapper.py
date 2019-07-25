@@ -10,6 +10,11 @@ from env_tools.car_racing import CarRacingSafe
 from gym_minigrid.envs.safe_crossing import SafeCrossing
 from gym_minigrid.minigrid import COLORS
 
+from typing import Tuple, List, Iterable, Optional, Any
+from textworld.gym import spaces as tw_spaces
+from textworld.envs.wrappers.filter import EnvInfos
+
+
 class PreprocessWrapperPytorch(gym.core.ObservationWrapper):
     def __init__(self, env):
         super().__init__(env)
@@ -264,6 +269,128 @@ class MinigridFrameStacker(gym.Wrapper):
 
         assert self.observation_space.contains(new_obs), "Problem, observation don't match observation space."
         return new_obs, reward, done, info
+
+
+
+# class ZorkPreproc(gym.Wrapper):
+#     def __init__(self, env):
+#         pass
+
+class TextWorldPreproc(gym.Wrapper):
+    """
+    Simple wrapper to preprocess text_world game observation
+    """
+    def __init__(self, env: gym.Env, encode_raw_text: bool = True,
+                 encode_extra_fields: Iterable[str] = ('description', 'inventory'),
+                 choose_among_useful_actions: bool = True,
+                 use_admissible_commands: bool = False,
+                 use_intermediate_reward: bool = False,
+                 tokens_limit: Optional[int] = None,
+                 n_dummy_action: int = 0):
+        """
+        :param env: env to be wrapped. Has to provide Word observations
+        :param encode_raw_text: do we need to encode raw observation from environment, if true, adds an extra encoder
+        :param encode_extra_fields: tuple of field names to be encoded, expected to be string values
+        :param use_admissible_commands: if true, admissible commands used for action wrapping
+        :param use_intermediate_reward: take intermediate reward into account
+        :param tokens_limit: optional limit of tokens in the encoded fields
+        """
+        super(TextWorldPreproc, self).__init__(env)
+        if not isinstance(env.observation_space, tw_spaces.Word):
+            raise ValueError("Env should expose text_world compatible observation space, "
+                             "this one gives %s" % env.observation_space)
+        self._encode_raw_text = encode_raw_text
+        self._encode_extra_field = tuple(encode_extra_fields)
+        self._use_admissible_commands = use_admissible_commands
+        self._choose_among_useful_actions = choose_among_useful_actions
+        self._use_intermedate_reward = use_intermediate_reward
+        self._num_fields = len(self._encode_extra_field) + int(self._encode_raw_text)
+        self._last_admissible_commands = None
+        self._last_extra_info = None
+        self._tokens_limit = tokens_limit
+        self._cmd_hist = []
+
+        self._all_doable_actions = self.compute_all_doable_actions()
+
+        if n_dummy_action:
+            self._all_doable_actions = self._all_doable_actions.extend([str(i) for i in range(n_dummy_action)])
+
+        #self.action_space = gym.spaces.Discrete(len(self._all_doable_actions))
+
+    @property
+    def num_fields(self):
+        return self._num_fields
+
+
+    def compute_all_doable_actions(self):
+
+        _, info = self.env.reset()
+
+        all_doable_actions = set(info["admissible_commands"])
+
+        for act in info["policy_commands"]:
+
+            _, reward, done, next_info = self.env.step(act)
+            all_doable_actions = all_doable_actions.union(set(next_info["admissible_commands"]))
+        return list(all_doable_actions)
+
+
+    def _encode(self, obs: str, extra_info: dict) -> dict:
+        obs_result = []
+        if self._encode_raw_text:
+            tokens = self.env.observation_space.tokenize(obs)
+            if self._tokens_limit is not None:
+                tokens = tokens[:self._tokens_limit]
+            obs_result.append(tokens)
+        for field in self._encode_extra_field:
+            tokens = self.env.observation_space.tokenize(extra_info[field])
+            if self._tokens_limit is not None:
+                tokens = tokens[:self._tokens_limit]
+            obs_result.append(tokens)
+        result = {"obs": obs_result}
+        if self._use_admissible_commands:
+            adm_result = []
+            for cmd in extra_info['admissible_commands']:
+                adm_result.append(self.env.action_space.tokenize(cmd))
+            result['admissible_commands'] = adm_result
+            self._last_admissible_commands = extra_info['admissible_commands']
+        self._last_extra_info = extra_info
+        return result
+
+    # TextWorld environment has a workaround of gym drawback:
+    # reset returns tuple with raw observation and extra dict
+    def reset(self):
+        res = self.env.reset()
+        self._cmd_hist = []
+        return self._encode(res[0], res[1])
+
+    def step(self, action):
+        if self._use_admissible_commands:
+            action = self._last_admissible_commands[action]
+            self._cmd_hist.append(action)
+        elif self._choose_among_useful_actions:
+            action = self._all_doable_actions[action]
+            self._cmd_hist.append(action)
+
+        obs, r, is_done, extra = self.env.step(action)
+        if self._use_intermedate_reward:
+            r += extra.get('intermediate_reward', 0)
+        new_extra = dict(extra)
+        for f in self._encode_extra_field + ('admissible_commands', 'intermediate_reward'):
+            if f in new_extra:
+                new_extra.pop(f)
+        # if is_done:
+        #     self.log.info("Commands: %s", self._cmd_hist)
+        #     self.log.info("Reward: %s, extra: %s", r, new_extra)
+        return self._encode(obs, extra), r, is_done, new_extra
+
+    @property
+    def last_admissible_commands(self):
+        return tuple(self._last_admissible_commands) if self._last_admissible_commands else None
+
+    @property
+    def last_extra_info(self):
+        return self._last_extra_info
 
 
 if __name__ == "__main__" :

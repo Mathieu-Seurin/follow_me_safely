@@ -4,7 +4,7 @@ from rl_agent.agent_utils import Transition, ReplayMemory, ProportionReplayMemor
 import torch
 import torch.nn.functional as F
 
-from rl_agent.models import FullyConnectedModel, ConvModel
+from rl_agent.models import FullyConnectedModel, ConvModel, TextModel
 import numpy as np
 from copy import copy, deepcopy
 
@@ -14,9 +14,11 @@ import tensorboardX
 
 from sklearn.metrics import f1_score, accuracy_score
 
+from rl_agent.preprocessor import TextPreprocessor, ImagePreprocessor
+
 class DQNAgent(object):
 
-    def __init__(self, config, n_action, state_dim, discount_factor, writer=None, log_stats_every=1e4):
+    def __init__(self, config, action_space, obs_space, discount_factor, writer=None, log_stats_every=1e4):
 
         self.save_config = config
         self.log_stats_every = log_stats_every
@@ -28,7 +30,7 @@ class DQNAgent(object):
         self.random_score_logger = []
 
         self.discount_factor = discount_factor
-        self.n_action = n_action.n
+        self.n_action = action_space.n
 
         self.lr = config["learning_rate"]
         self.weight_decay = config["weight_decay"]
@@ -89,12 +91,17 @@ class DQNAgent(object):
 
         # ========== Model ===============
 
-        Model = FullyConnectedModel if config["model_type"] == "fc" else ConvModel
+        if config["model_type"] == "fc" :
+            Model = FullyConnectedModel
+        elif config["model_type"] == "text":
+            Model = TextModel
+            self.preprocessor = TextPreprocessor
+        else:
+            Model = ConvModel
+            self.preprocessor = ImagePreprocessor
 
-        self.policy_net = Model(config["model_params"], n_action=n_action, state_dim=state_dim,
-                                learn_feedback_classif=self.use_supervised_loss).to(TORCH_DEVICE)
-        self.target_net = Model(config["model_params"], n_action=n_action, state_dim=state_dim,
-                                learn_feedback_classif=self.use_supervised_loss).to(TORCH_DEVICE)
+        self.policy_net = Model(config["model_params"], action_space=action_space, obs_space=obs_space).to(TORCH_DEVICE)
+        self.target_net = Model(config["model_params"], action_space=action_space, obs_space=obs_space).to(TORCH_DEVICE)
         self.target_net.load_state_dict(self.policy_net.state_dict())
         self.target_net.eval()
 
@@ -102,7 +109,7 @@ class DQNAgent(object):
 
         if config["exploration_method"] == "eps_greedy":
 
-            self.select_action = self._select_action_eps_greedy
+            self._select_action = self._select_action_eps_greedy
             self.epsilon_init = config["exploration_params"]["begin_eps"]
             self.current_eps = copy(self.epsilon_init)
             self.expected_exploration_steps = config["exploration_params"]["expected_step_explo"]
@@ -121,7 +128,7 @@ class DQNAgent(object):
 
         elif config["exploration_method"] == "boltzmann" :
 
-            self.select_action = self._select_action_boltzmann
+            self._select_action = self._select_action_boltzmann
             self.epsilon_init = config["exploration_params"]["begin_eps"]
             self.current_eps = copy(self.epsilon_init)
             self.expected_exploration_steps = config["exploration_params"]["expected_step_explo"]
@@ -129,6 +136,7 @@ class DQNAgent(object):
             self.n_step_eps = 0
 
 
+        self.select_action = lambda x : self._select_action(self.preprocessor(x))
         self.summary_writer = writer
 
     def select_action_greedy(self, state):
@@ -141,7 +149,7 @@ class DQNAgent(object):
                 qs = self.policy_net(state.to(TORCH_DEVICE))
                 return qs.max(1)[1].view(1, 1).to('cpu')
         else:
-            return torch.tensor([[np.random.randint(self.n_action)]], dtype=torch.long)
+            return np.random.randint(self.n_action)
 
     def get_q_values(self, state):
         with torch.no_grad():
@@ -164,10 +172,10 @@ class DQNAgent(object):
         self.n_step_eps += 1
 
         if np.random.random() > self.current_eps:
-            return self.get_q_values(state).max(1)[1].view(1, 1).to('cpu')
+            return self.get_q_values(state).max(1)[1].item()
         else:
             act = np.random.choice(self.n_action, p=self.action_proba)
-            return torch.tensor([[act]], dtype=torch.long)
+            return act
 
     def _select_action_boltzmann(self, state):
 
@@ -179,7 +187,7 @@ class DQNAgent(object):
             - 2.5 * self.n_step_eps / self.expected_exploration_steps))
         self.n_step_eps += 1
 
-        return torch.tensor([[act]], dtype=torch.long)
+        return act
 
 
     def push(self, *args):
@@ -202,6 +210,7 @@ class DQNAgent(object):
 
 
     def optimize(self, total_iter):
+
         if len(self.memory) < self.batch_size:
             if self.summary_writer and total_iter % self.log_stats_every == 0:
                 self.summary_writer.add_scalar("data/feedback_loss", 0, total_iter)
@@ -213,10 +222,10 @@ class DQNAgent(object):
         # to Transition of batch-arrays.
         batch = Transition(*zip(*transitions))
 
-        state_batch = torch.cat(batch.state).to(TORCH_DEVICE)
-        action_batch = torch.cat(batch.action).to(TORCH_DEVICE)
-        reward_batch = torch.cat(batch.reward).to(TORCH_DEVICE)
-        feedback_batch = torch.cat(batch.gave_feedback).to(TORCH_DEVICE)
+        state_batch = self.preprocessor(batch.state)
+        action_batch = torch.LongTensor(batch.action).unsqueeze(1).to(TORCH_DEVICE)
+        reward_batch = torch.FloatTensor(batch.reward).to(TORCH_DEVICE)
+        feedback_batch =  torch.FloatTensor(batch.gave_feedback).unsqueeze(1).to(TORCH_DEVICE)
 
         # Compute a mask of non-final states and concatenate the batch elements
         # (a final state would've been the one after which simulation ended)
@@ -227,8 +236,9 @@ class DQNAgent(object):
             no_feed_batch = feedback_batch == 0
             non_final_mask = non_final_mask * no_feed_batch
 
-        non_final_next_states = torch.cat([s for i, s in enumerate(batch.next_state)
-                                           if s is not None and non_final_mask[i]]).to(TORCH_DEVICE)
+        non_final_next_states = [s for i, s in enumerate(batch.next_state)
+                                 if s is not None and non_final_mask[i]]
+        non_final_next_states = self.preprocessor(non_final_next_states)
 
 
         # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
@@ -282,7 +292,9 @@ class DQNAgent(object):
 
         expected_state_action_values = expected_state_action_values.unsqueeze(1)
         # Compute Huber loss
-        assert state_action_values.size() == expected_state_action_values.size()
+        assert state_action_values.size() == expected_state_action_values.size(), "Q(s,a) : {} \n Q'(s,a) : {}".format(
+            state_action_values.size(),expected_state_action_values.size())
+
         q_loss = F.smooth_l1_loss(state_action_values, expected_state_action_values)
 
         nudging_loss_weighted = 0

@@ -8,7 +8,7 @@
   "reward_when_out" : 0,
   "feedback_when_wall_hit" : 0,
 
-  "n_zone" : 7,
+  "n_zone" : 2,
 
   "good_zone_action_proba" : 1,
   "bad_zone_action_proba" : 0,

@@ -67,9 +67,7 @@ num_episode = 0
 
 model_type = full_config["agent_type"]
 if model_type == "dqn" :
-    model = DQNAgent(config=full_config["dqn_params"],
-                     n_action=game.action_space,
-                     state_dim=game.observation_space,
+    model = DQNAgent(config=full_config["dqn_params"], action_space=game.action_space, obs_space=game.observation_space,
                      discount_factor=discount_factor)
 else:
     raise NotImplementedError("{} not available for model".format(full_config["agent_type"]))
