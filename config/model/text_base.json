@@ -34,7 +34,7 @@
      "exploration_params" :
      {
       "begin_eps" : 1,
-      "expected_step_explo" : 30000,
+      "expected_step_explo" : 2500,
       "epsilon_minimum" : 0.04
      },
 

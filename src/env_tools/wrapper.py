@@ -440,11 +440,12 @@ class TextWorldWrapper(gym.Wrapper):
 
         if action not in self._last_state['raw']['admissible_commands']:
             state['gave_feedback'] = True
-            new_extra['gave_feedback'] = True
         else:
             state['gave_feedback'] = False
-            new_extra['gave_feedback'] = False
 
+        new_extra['gave_feedback'] = state['gave_feedback']
+
+        self._last_state = copy.deepcopy(state)
         return state, r, is_done, new_extra
 
     @property
