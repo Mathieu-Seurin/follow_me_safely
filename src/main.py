@@ -13,7 +13,7 @@ import numpy as np
 import textworld
 import textworld.gym as tw_gym
 from textworld.envs.wrappers.filter import EnvInfos
-from env_tools.wrapper import TextWorldPreproc
+from env_tools.wrapper import TextWorldWrapper
 
 @ray.remote(num_gpus=0.24)
 def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_test, override_expe=True, save_images=False):
@@ -143,16 +143,16 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
         EXTRA_GAME_INFO = {
             "inventory": True,
             "description": True,
-            "intermediate_reward": True,
+            "intermediate_reward": full_config["use_intermediate_reward"],
             "admissible_commands": True,
             "policy_commands": True,
         }
 
-        env_id = tw_gym.register_game("simple1.ulx", max_episode_steps=10,
+        reward_when_falling = 0
+        env_id = tw_gym.register_game("simple1.ulx", max_episode_steps=full_config["max_episode_steps"],
                                       name="simple1", request_infos=EnvInfos(**EXTRA_GAME_INFO))
         game = gym.make(env_id)
-
-        game = TextWorldPreproc(env=game)
+        game = TextWorldWrapper(env=game, use_intermediate_reward=EXTRA_GAME_INFO["intermediate_reward"])
 
     else:
         game = gym.make(full_config["env_name"])
@@ -243,7 +243,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
 
                 percentage_tile_seen = max(info.get('percentage_road_visited', 0), percentage_tile_seen)
                 n_feedback_this_ep += info['gave_feedback']
-                self_kill_trial += info['tried_destruct']
+                self_kill_trial += info.get('tried_destruct',0)
 
                 assert next_state['gave_feedback'] == info['gave_feedback'], "Problem, info should contain the same info as state"
 
@@ -329,13 +329,12 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
             percentage_tile_seen_list.append(percentage_tile_seen)
             iter_this_ep_list.append(iter_this_ep)
 
-            self_destruct_list.append(info['self_destruct'])
+            self_destruct_list.append(info.get('self_destruct',0))
             self_destruct_trial_list.append(self_kill_trial)
             reward_wo_feedback_list.append(reward_wo_feedback)
 
-
             print("End of ep #{}, n_timesteps (estim) {}, iter_this_ep : {}, current_eps {}, zone {}".format(
-                num_episode, total_iter, np.mean(iter_this_ep_list[-1]), model.current_eps, state['zone']))
+                num_episode, total_iter, np.mean(iter_this_ep_list[-1]), model.current_eps, state.get('zone', "Not applicable")))
 
             print("(Estim) Discounted rew : {} undiscounted : {}, unbiaised : {},  n_feedback {} \n\n".format(
                 np.mean(last_reward_discount_list[-1]), np.mean(last_reward_undiscount_list[-1]),

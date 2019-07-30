@@ -20,4 +20,22 @@ def ImagePreprocessor(state):
 
 
 def TextPreprocessor(state):
-    pass
+    """
+    Batchify and convert text state to torch Tensor
+    :param state:
+    :return:
+    """
+
+    processed_state = dict()
+    if isinstance(state, dict):
+        for key in state.keys():
+            processed_state[key] = dict()
+            processed_state[key]["seq"] = torch.tensor(state[key]).unsqueeze(0).to(TORCH_DEVICE)
+            processed_state[key]["lengths"] = torch.LongTensor(state[key].shape)
+    else:
+        for key in state[0].keys():
+            processed_state[key] = dict()
+            processed_state[key]["lengths"] = torch.LongTensor([x[key].shape[0] for x in state])
+            processed_state[key]["seq"] = torch.nn.utils.rnn.pad_sequence([torch.LongTensor(x[key]) for x in state],
+                                                                          padding_value=0, batch_first=True).to(TORCH_DEVICE)
+    return processed_state

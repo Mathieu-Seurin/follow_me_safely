@@ -60,39 +60,76 @@ class TextModel(nn.Module):
         self.embedding = nn.Embedding(num_embeddings=vocab_size,
                                       embedding_dim=embedding_dim)
 
+        if config["rnn_type"].lower() == 'lstm':
+            RNN = nn.LSTM
+        elif config["rnn_type"].lower() == 'gru':
+            RNN = nn.GRU
+        else:
+            raise NotImplementedError("Wrong RNN type, is {}".format(config["rnn_type"]))
+
         self.encoders = dict()
 
-        self.encoders['obs'] = nn.LSTM(input_size=10,
+        self.encoders['obs'] = RNN(input_size=embedding_dim,
                                        num_layers=1,
                                        hidden_size=config["obs_rnn_size"],
                                        dropout=0,
                                        bidirectional=config["bidir"],
                                        batch_first=True)
 
-        self.encoders['inventory'] = nn.LSTM(input_size=10,
+        self.add_module('obs_encoder', self.encoders['obs'])
+
+        self.encoders['description'] = RNN(input_size=embedding_dim,
+                                         num_layers=1,
+                                         hidden_size=config["description_rnn_size"],
+                                         bidirectional=config["bidir"],
+                                         dropout=0,
+                                         batch_first=True)
+
+        self.add_module('description_encoder', self.encoders['description'])
+
+
+        self.encoders['inventory'] = RNN(input_size=embedding_dim,
                                              num_layers=1,
                                              hidden_size=config["inventory_rnn_size"],
                                              bidirectional=config["bidir"],
                                              dropout=0,
                                              batch_first=True)
 
+        self.add_module('inventory_encoder', self.encoders['inventory'])
+
+
+        in_fc = config["obs_rnn_size"] + config["description_rnn_size"] + config["inventory_rnn_size"]
+
+        self.fc_hidden = nn.Linear(in_fc, out_features=config["fc_hidden"])
+        self.fc_output = nn.Linear(config["fc_hidden"], out_features=self.n_output_size)
+
     def encode_sequences(self, batch_seq):
 
-        sorted_batch_seq, ord_inv_index = order_batch(batch_seq)
-        return None
+        output_seqs = []
+        for key in batch_seq.keys():
+            seq = torch.nn.utils.rnn.pack_padded_sequence(batch_seq[key]["seq"], batch_seq[key]["lengths"],
+                                                          batch_first=True,
+                                                          enforce_sorted=False)
+            output, (hidden, cn) = self.encoders[key](seq)
+            # seq = torch.nn.utils.rnn.pad_packed_sequence(output, batch_first=True)
+            output_seqs.append(hidden[0])
 
+        return output_seqs
 
 
     def forward(self, x):
 
-        x = self.embedding(x)
+        output = dict()
+        for key in x.keys():
+            output[key] = dict()
+            output[key]["seq"] = self.embedding(x[key]["seq"])
+            output[key]["lengths"] = x[key]["lengths"]
 
-        encoded_inv = self.encode_sequences(x['inventory'])
-        encoded_desc = self.encode_sequences(x['description'])
+        encoded_seq_list = self.encode_sequences(output)
+        encoded_seq_concat = torch.cat(encoded_seq_list, dim=1)
 
-
-        x = F.relu(self.hidden_layer(x))
-        x = self.out_layer(x)
+        x = F.relu(self.fc_hidden(encoded_seq_concat))
+        x = self.fc_output(x)
         return x
 
 

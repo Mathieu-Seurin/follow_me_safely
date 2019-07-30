@@ -12,9 +12,10 @@
       "rnn_type": "lstm",
       "word_embedding_size" : 128,
       "inventory_rnn_size" : 256,
+      "description_rnn_size" : 256,
       "obs_rnn_size" : 256,
       "bidir": false,
-      "n_mlp_hidden": 256
+      "fc_hidden": 350
     },
 
 
@@ -26,7 +27,7 @@
     "learning_rate": 5e-4,
     "weight_decay" : 0,
 
-    "batch_size": 256,
+    "batch_size": 256 ,
 
     "exploration_method": "eps_greedy" ,
 

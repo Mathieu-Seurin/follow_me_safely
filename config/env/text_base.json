@@ -1,15 +1,17 @@
 {
-  "name": "text_simple1.json",
+  "name": "text_simple1_intermediate_reward",
 
   "reward_when_no_action" : 0,
+  "max_episode_steps" : 200,
+
+  "use_intermediate_reward" : true,
 
   "n_actions" : 0,
 
   "save_images_at" : [50, 51, 52, 53, 1200, 1201, 1202, 1203, 1204],
 
-
   "stop" : {
-    "max_iter_expe" : 1000,
+    "max_iter_expe" : 10000,
     "episode_reward_mean" : 800
   }
 }

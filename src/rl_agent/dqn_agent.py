@@ -146,7 +146,7 @@ class DQNAgent(object):
                 # t.max(1) will return largest column value of each row.
                 # second column on max result is index of where max element was
                 # found, so we pick action with the larger expected reward.
-                qs = self.policy_net(state.to(TORCH_DEVICE))
+                qs = self.policy_net(state)
                 return qs.max(1)[1].view(1, 1).to('cpu')
         else:
             return np.random.randint(self.n_action)
@@ -156,7 +156,7 @@ class DQNAgent(object):
             # t.max(1) will return largest column value of each row.
             # second column on max result is index of where max element was
             # found, so we pick action with the larger expected reward.
-            qs = self.policy_net(state.to(TORCH_DEVICE))
+            qs = self.policy_net(state)
             return qs
 
     def _select_action_eps_greedy(self, state):
@@ -238,6 +238,7 @@ class DQNAgent(object):
 
         non_final_next_states = [s for i, s in enumerate(batch.next_state)
                                  if s is not None and non_final_mask[i]]
+
         non_final_next_states = self.preprocessor(non_final_next_states)
 
 

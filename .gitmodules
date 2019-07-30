@@ -4,3 +4,6 @@
 [submodule "src/tensorboard-aggregator"]
 	path = src/tensorboard-aggregator
 	url = https://github.com/Mathieu-Seurin/tensorboard-aggregator.git
+[submodule "src/TextWorld"]
+	path = src/TextWorld
+	url = https://github.com/Mathieu-Seurin/TextWorld.git

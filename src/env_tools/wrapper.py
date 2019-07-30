@@ -14,6 +14,12 @@ from typing import Tuple, List, Iterable, Optional, Any
 from textworld.gym import spaces as tw_spaces
 from textworld.envs.wrappers.filter import EnvInfos
 
+import copy
+from PIL import Image, ImageDraw, ImageFont
+import matplotlib.pyplot as plt
+from math import floor
+
+import platform
 
 class PreprocessWrapperPytorch(gym.core.ObservationWrapper):
     def __init__(self, env):
@@ -274,7 +280,7 @@ class MinigridFrameStacker(gym.Wrapper):
 #     def __init__(self, env):
 #         pass
 
-class TextWorldPreproc(gym.Wrapper):
+class TextWorldWrapper(gym.Wrapper):
     """
     Simple wrapper to preprocess text_world game observation
     """
@@ -282,7 +288,7 @@ class TextWorldPreproc(gym.Wrapper):
                  encode_extra_fields: Iterable[str] = ('description', 'inventory'),
                  choose_among_useful_actions: bool = True,
                  use_admissible_commands: bool = False,
-                 use_intermediate_reward: bool = False,
+                 use_intermediate_reward: bool = True,
                  tokens_limit: Optional[int] = None,
                  n_dummy_action: int = 0):
         """
@@ -293,7 +299,7 @@ class TextWorldPreproc(gym.Wrapper):
         :param use_intermediate_reward: take intermediate reward into account
         :param tokens_limit: optional limit of tokens in the encoded fields
         """
-        super(TextWorldPreproc, self).__init__(env)
+        super(TextWorldWrapper, self).__init__(env)
         if not isinstance(env.observation_space, tw_spaces.Word):
             raise ValueError("Env should expose text_world compatible observation space, "
                              "this one gives %s" % env.observation_space)
@@ -314,17 +320,54 @@ class TextWorldPreproc(gym.Wrapper):
             self._all_doable_actions = self._all_doable_actions.extend([str(i) for i in range(n_dummy_action)])
 
         self.action_space = gym.spaces.Discrete(len(self._all_doable_actions))
+        self.env.action_map = self._all_doable_actions
 
     @property
     def num_fields(self):
         return self._num_fields
 
 
+    def _unconvert(self, state):
+
+        def fit_state(raw_sentences, split_every=8):
+            keys = ['obs', 'description', 'inventory']
+            state_str = ''
+
+            for key in keys:
+                state_str_tmp = raw_sentences[key].replace('\n', ' ')
+                list_sentence = state_str_tmp.split()
+
+                n_words = len(list_sentence)
+
+                for idx in range(round(floor(n_words/split_every)*split_every), 0, -split_every):
+                    list_sentence.insert(idx, '\n')
+
+                sentence = ' '.join(list_sentence)
+                state_str += sentence + '\n\n'
+
+            return state_str
+
+
+        font_path = '/usr/share/fonts/truetype/lato/Lato-Medium.ttf' if 'Linux' in platform.system() else '/Library/Fonts/Arial.ttf'
+
+        blank_image = Image.new('RGBA', (400, 300), 'black')
+        img_draw = ImageDraw.Draw(blank_image)
+        fnt = ImageFont.truetype(font_path, 17)
+        img_draw.text((0, 0), fit_state(state['raw']), fill='green', font=fnt)
+        # plt.imshow(blank_image)
+        # plt.show()
+        return np.array(blank_image)
+
     def compute_all_doable_actions(self):
 
         _, info = self.env.reset()
 
         all_doable_actions = set(info["admissible_commands"])
+        all_doable_actions.add("go north")
+        all_doable_actions.add("go east")
+        all_doable_actions.add("go west")
+        all_doable_actions.add("go south")
+        all_doable_actions.add("take keycard")
 
         for act in info["policy_commands"]:
 
@@ -334,33 +377,41 @@ class TextWorldPreproc(gym.Wrapper):
 
 
     def _encode(self, obs: str, extra_info: dict) -> dict:
-        obs_result = []
+
+        state_result = OrderedDict()
         if self._encode_raw_text:
             tokens = self.env.observation_space.tokenize(obs)
             if self._tokens_limit is not None:
                 tokens = tokens[:self._tokens_limit]
-            obs_result.append(tokens)
+            state_result['obs'] = tokens
         for field in self._encode_extra_field:
             tokens = self.env.observation_space.tokenize(extra_info[field])
             if self._tokens_limit is not None:
                 tokens = tokens[:self._tokens_limit]
-            obs_result.append(tokens)
-        result = {"obs": obs_result}
+            state_result[field] = tokens
         if self._use_admissible_commands:
             adm_result = []
             for cmd in extra_info['admissible_commands']:
                 adm_result.append(self.env.action_space.tokenize(cmd))
-            result['admissible_commands'] = adm_result
+            state_result['admissible_commands'] = adm_result
             self._last_admissible_commands = extra_info['admissible_commands']
         self._last_extra_info = extra_info
-        return result
+        return state_result
 
     # TextWorld environment has a workaround of gym drawback:
     # reset returns tuple with raw observation and extra dict
     def reset(self):
         res = self.env.reset()
         self._cmd_hist = []
-        return self._encode(res[0], res[1])
+        encoded_state = self._encode(res[0], res[1])
+        state = dict()
+        state['state'] = encoded_state
+        state['raw'] = dict(**res[1])
+        state['raw']['obs'] = res[0]
+        state['gave_feedback'] = False
+
+        self._last_state = copy.deepcopy(state)
+        return state
 
     def step(self, action):
         if self._use_admissible_commands:
@@ -380,7 +431,21 @@ class TextWorldPreproc(gym.Wrapper):
         # if is_done:
         #     self.log.info("Commands: %s", self._cmd_hist)
         #     self.log.info("Reward: %s, extra: %s", r, new_extra)
-        return self._encode(obs, extra), r, is_done, new_extra
+        encoded_state = self._encode(obs, extra)
+
+        state = dict()
+        state['state'] = encoded_state
+        state['raw'] = dict(**extra)
+        state['raw']['obs'] = obs
+
+        if action not in self._last_state['raw']['admissible_commands']:
+            state['gave_feedback'] = True
+            new_extra['gave_feedback'] = True
+        else:
+            state['gave_feedback'] = False
+            new_extra['gave_feedback'] = False
+
+        return state, r, is_done, new_extra
 
     @property
     def last_admissible_commands(self):
@@ -395,7 +460,8 @@ if __name__ == "__main__" :
 
 
     test_car_racing = False
-    test_minigrid = True
+    test_minigrid = False
+    test_text_world = True
 
     # Car Racing env test
     if test_car_racing:
@@ -480,5 +546,26 @@ if __name__ == "__main__" :
                 print(rew, done, step)
 
         print(rew, done, step)
+
+    if test_text_world:
+
+        import textworld.gym as tw_gym
+
+        EXTRA_GAME_INFO = {
+            "inventory": True,
+            "description": True,
+            "intermediate_reward": True,
+            "admissible_commands": True,
+            "policy_commands": True,
+        }
+
+        env_id = tw_gym.register_game("simple1.ulx", max_episode_steps=20,
+                                      name="simple1", request_infos=EnvInfos(**EXTRA_GAME_INFO))
+        game = gym.make(env_id)
+        game = TextWorldWrapper(env=game)
+
+        game.reset()
+        state, reward, done, info = game.step(1)
+        game._unconvert(state)
 
 
