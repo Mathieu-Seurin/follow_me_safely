@@ -360,20 +360,33 @@ class TextWorldWrapper(gym.Wrapper):
 
     def compute_all_doable_actions(self):
 
-        _, info = self.env.reset()
+        def _complete_action_recurs(command, obj_list):
 
-        all_doable_actions = set(info["admissible_commands"])
-        all_doable_actions.add("go north")
-        all_doable_actions.add("go east")
-        all_doable_actions.add("go west")
-        all_doable_actions.add("go south")
-        all_doable_actions.add("take keycard")
+            command_list = []
 
-        for act in info["policy_commands"]:
+            start_index_brack = command.find('{')
+            if start_index_brack == -1:
+                return [command]
+            else:
+                for obj in obj_list:
+                    # obj[1] is the type of the object
+                    obj_type = '{'+obj[1]+'}'
+                    obj_name = obj[0]
 
-            _, reward, done, next_info = self.env.step(act)
-            all_doable_actions = all_doable_actions.union(set(next_info["admissible_commands"]))
-        return list(all_doable_actions)
+                    if obj_type == command[start_index_brack:start_index_brack+3]:
+                        partially_completed_command = command.replace(obj_type, obj_name)
+                        command_list.extend(_complete_action_recurs(partially_completed_command, obj_list))
+
+            return command_list
+
+        internal_game = self.env.env.textworld_env._wrapped_env.game_state._env.game
+        obj_list = internal_game.objects_names_and_types
+
+        all_doable_actions = []
+        for command in internal_game.command_templates :
+            all_doable_actions.extend(_complete_action_recurs(command, obj_list))
+
+        return all_doable_actions
 
 
     def _encode(self, obs: str, extra_info: dict) -> dict:

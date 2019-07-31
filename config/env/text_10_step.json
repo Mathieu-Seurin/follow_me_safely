@@ -1,11 +1,11 @@
 {
-  "name": "text_simple1_intermediate_reward",
+  "name": "text_10_intermediate_reward",
 
   "reward_when_no_action" : 0,
   "max_episode_steps" : 200,
 
   "use_intermediate_reward" : true,
-  "ulx_file" : "simple1.ulx",
+  "ulx_file" : "simple10.ulx",
 
   "n_actions" : 0,
 

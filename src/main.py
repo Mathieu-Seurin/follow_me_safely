@@ -149,7 +149,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
         }
 
         reward_when_falling = 0
-        env_id = tw_gym.register_game("simple1.ulx", max_episode_steps=full_config["max_episode_steps"],
+        env_id = tw_gym.register_game(full_config['ulx_file'], max_episode_steps=full_config["max_episode_steps"],
                                       name="simple1", request_infos=EnvInfos(**EXTRA_GAME_INFO))
         game = gym.make(env_id)
         game = TextWorldWrapper(env=game, use_intermediate_reward=EXTRA_GAME_INFO["intermediate_reward"])
