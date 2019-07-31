@@ -10,19 +10,11 @@ import tensorboardX
 import tensorflow as tf
 import numpy as np
 
-import textworld
-import textworld.gym as tw_gym
-from textworld.envs.wrappers.filter import EnvInfos
-from env_tools.wrapper import TextWorldWrapper
+import gym
 
 @ray.remote(num_gpus=0.24)
 def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_test, override_expe=True, save_images=False):
     import argparse
-
-    import gym.wrappers
-    from env_tools.wrapper import CarFrameStackWrapper, CarActionWrapper, MinigridFrameStacker
-
-    from gym_minigrid.envs.safe_crossing import SafeCrossing
 
     from rl_agent.agent_utils import render_state_and_q_values
 
@@ -30,8 +22,6 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
     from rl_agent.dqn_agent import DQNAgent
 
     import torch
-
-    from env_tools.car_racing import CarRacingSafe
 
     print("Expe",env_config, env_ext, model_config, model_ext, exp_dir, seed, sep='  ')
     print("Is cuda available ?", torch.cuda.is_available())
@@ -92,8 +82,12 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
 
     writer = tensorboardX.SummaryWriter(expe_path)
 
-
     if "racing" in full_config["env_name"].lower():
+
+        from env_tools.car_racing import CarRacingSafe
+        from env_tools.wrapper import CarFrameStackWrapper, CarActionWrapper
+
+
         reset_when_out = full_config["reset_when_out"]
         reward_when_falling = full_config["reward_when_out"]
         max_steps = full_config["max_steps"]
@@ -109,6 +103,9 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
         game = CarFrameStackWrapper(game, n_frameskip=n_frameskip)
 
     elif "minigrid" in full_config['env_name'].lower():
+
+        from gym_minigrid.envs.safe_crossing import SafeCrossing
+        from env_tools.wrapper import MinigridFrameStacker
 
         reward_when_falling = full_config["reward_when_out"]
         size = full_config["size_env"]
@@ -140,6 +137,12 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
         #game = textworld.start('./zork1.z5')
 
     elif "text" in full_config['env_name'].lower():
+
+        import textworld.gym as tw_gym
+        from textworld.envs.wrappers.filter import EnvInfos
+        from env_tools.wrapper import TextWorldWrapper
+
+
         EXTRA_GAME_INFO = {
             "inventory": True,
             "description": True,

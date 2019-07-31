@@ -379,6 +379,7 @@ class TextWorldWrapper(gym.Wrapper):
 
             return command_list
 
+        self.env.reset()
         internal_game = self.env.env.textworld_env._wrapped_env.game_state._env.game
         obj_list = internal_game.objects_names_and_types
 
