@@ -322,6 +322,9 @@ class TextWorldWrapper(gym.Wrapper):
         self.action_space = gym.spaces.Discrete(len(self._all_doable_actions))
         self.env.action_map = self._all_doable_actions
 
+        # Hidden action, shouldn't be used by agent
+        #self._all_doable_actions.append('undo')
+
     @property
     def num_fields(self):
         return self._num_fields
@@ -379,14 +382,32 @@ class TextWorldWrapper(gym.Wrapper):
 
             return command_list
 
-        self.env.reset()
+        obs, extra = self.env.reset()
         internal_game = self.env.env.textworld_env._wrapped_env.game_state._env.game
         obj_list = internal_game.objects_names_and_types
+
+        # Some type are subclasses of other type, need to add them
+        additionnal_obj = []
+        for obj in obj_list:
+            if obj[1] in ['f', 'k']:
+                additionnal_obj.append((obj[0],'o'))
+
+        obj_list.extend(additionnal_obj)
 
         all_doable_actions = []
         for command in internal_game.command_templates :
             all_doable_actions.extend(_complete_action_recurs(command, obj_list))
 
+        # Check that at least all necessary actions are in the possible actions list.
+        actions_not_available = []
+        for act in extra['policy_commands']:
+            if act not in all_doable_actions:
+                actions_not_available.append(act)
+
+        assert len(actions_not_available) == 0,\
+            "Some useful actions are not available, check all_doable_actions \n{}".format(actions_not_available)
+
+        print("Number of available actions : ", len(all_doable_actions))
         return all_doable_actions
 
 
@@ -452,8 +473,9 @@ class TextWorldWrapper(gym.Wrapper):
         state['raw'] = dict(**extra)
         state['raw']['obs'] = obs
 
-        if action not in self._last_state['raw']['admissible_commands']:
+        if self._last_state['raw']['admissible_commands'] == state['raw']['admissible_commands']:
             state['gave_feedback'] = True
+            assert action not in self._last_state['raw']['admissible_commands'], "Problem, action should have done something"
         else:
             state['gave_feedback'] = False
 
@@ -565,6 +587,7 @@ if __name__ == "__main__" :
     if test_text_world:
 
         import textworld.gym as tw_gym
+        import os
 
         EXTRA_GAME_INFO = {
             "inventory": True,
@@ -574,13 +597,23 @@ if __name__ == "__main__" :
             "policy_commands": True,
         }
 
-        env_id = tw_gym.register_game("simple1.ulx", max_episode_steps=20,
+        game_path = os.path.join("text_game_files","simple10.ulx")
+
+        env_id = tw_gym.register_game(game_path, max_episode_steps=1000,
                                       name="simple1", request_infos=EnvInfos(**EXTRA_GAME_INFO))
         game = gym.make(env_id)
         game = TextWorldWrapper(env=game)
 
         game.reset()
-        state, reward, done, info = game.step(1)
-        game._unconvert(state)
+
+        done = False
+        while not done:
+            act = game.action_space.sample()
+            state, reward, done, info = game.step(act)
+
+            if state['gave_feedback']:
+                print("Feedback")
+            else:
+                print("No feedback")
 
 

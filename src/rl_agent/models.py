@@ -28,24 +28,6 @@ class FullyConnectedModel(nn.Module):
 
         return x
 
-
-class ConvTextModel(nn.Module):
-    def __init__(self, config, action_space, obs_space):
-        pass
-
-
-def order_batch(batch):
-    """
-    Order batch of sequences by sequence len and keep inverse
-    :param batch: list of lists of items
-    :return: Tuple[sorted batch, numpy array to return the order]
-    """
-    lens = list(map(len, batch))
-    ord_idx = np.flip(np.argsort(lens, kind='stable'))
-    ord_inv = np.argsort(ord_idx, kind='stable')
-    ord_batch = [batch[idx] for idx in ord_idx]
-    return ord_batch, ord_inv
-
 class TextModel(nn.Module):
     def __init__(self, config, action_space, obs_space):
 
@@ -58,7 +40,8 @@ class TextModel(nn.Module):
         embedding_dim = config["word_embedding_size"]
 
         self.embedding = nn.Embedding(num_embeddings=vocab_size,
-                                      embedding_dim=embedding_dim)
+                                      embedding_dim=embedding_dim,
+                                      padding_idx=0)
 
         if config["rnn_type"].lower() == 'lstm':
             RNN = nn.LSTM
@@ -193,8 +176,8 @@ class ConvModel(nn.Module):
 
         x = self.conv_layers(x)
         x = x.view(x.size(0), -1)
-        self.last_activation_before_output = F.relu(self.hidden_layer(x))
-        output = self.output_layer(self.last_activation_before_output)
+        last_activation_before_output = F.relu(self.hidden_layer(x))
+        output = self.output_layer(last_activation_before_output)
         return output
 
     def compute_classif_forward(self, states, actions):

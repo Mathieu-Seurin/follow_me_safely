@@ -34,7 +34,7 @@
      "exploration_params" :
      {
       "begin_eps" : 1,
-      "expected_step_explo" : 2500,
+      "expected_step_explo" : 4000,
       "epsilon_minimum" : 0.04
      },
 
@@ -57,7 +57,7 @@
     "nudging_loss_weight" : 0,
     "nudging_type" : "none",
 
-    "supervised_loss_weight" : 0
+    "classif_learning_rate" : 3e-4
 
   }
 }

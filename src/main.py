@@ -12,7 +12,7 @@ import numpy as np
 
 import gym
 
-@ray.remote(num_gpus=0.24)
+@ray.remote(num_gpus=0.50)
 def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_test, override_expe=True, save_images=False):
     import argparse
 
@@ -152,7 +152,9 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
         }
 
         reward_when_falling = 0
-        env_id = tw_gym.register_game(full_config['ulx_file'], max_episode_steps=full_config["max_episode_steps"],
+
+        game_path = os.path.join("text_game_files", full_config['ulx_file'])
+        env_id = tw_gym.register_game(game_path, max_episode_steps=full_config["max_episode_steps"],
                                       name="simple1", request_infos=EnvInfos(**EXTRA_GAME_INFO))
         game = gym.make(env_id)
         game = TextWorldWrapper(env=game, use_intermediate_reward=EXTRA_GAME_INFO["intermediate_reward"])
@@ -242,7 +244,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
                 state = next_state
 
                 total_iter += 1
-                iter_this_ep = iter_this_ep + 1
+                iter_this_ep += 1
 
                 percentage_tile_seen = max(info.get('percentage_road_visited', 0), percentage_tile_seen)
                 n_feedback_this_ep += info['gave_feedback']
@@ -342,6 +344,9 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
             print("(Estim) Discounted rew : {} undiscounted : {}, unbiaised : {},  n_feedback {} \n\n".format(
                 np.mean(last_reward_discount_list[-1]), np.mean(last_reward_undiscount_list[-1]),
                 reward_wo_feedback_list[-1], np.mean(feedback_per_ep_list[-1])))
+
+
+            assert total_iter > reward_wo_feedback_list[-1] + feedback_per_ep_list[-1]
 
             if reward_total_discounted > score_success:
                 success_count += 1

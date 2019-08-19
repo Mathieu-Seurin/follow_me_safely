@@ -5,7 +5,6 @@
   "max_episode_steps" : 200,
 
   "use_intermediate_reward" : true,
-  "ulx_file" : "simple10.ulx",
 
   "n_actions" : 0,
 

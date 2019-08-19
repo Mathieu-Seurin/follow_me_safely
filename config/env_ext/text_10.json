@@ -1,0 +1,9 @@
+{
+  "name" : "10_steps_to_goal",
+  "ulx_file" : "simple10.ulx",
+
+  "stop" : {
+    "max_iter_expe" : 10000
+  }
+
+}

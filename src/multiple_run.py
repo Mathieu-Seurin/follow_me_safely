@@ -74,7 +74,7 @@ if __name__ == "__main__":
     while not done:
         try:
             list_success = ray.get([train.remote(**config, override_expe=False, save_images=True) for config in configs])
-        except ray.exceptions.RayWorkerError:
+        except (ray.exceptions.RayWorkerError, ray.exceptions.RayTaskError) as e:
             ray.shutdown()
             ray.init(num_gpus=args.n_gpus)
             continue
