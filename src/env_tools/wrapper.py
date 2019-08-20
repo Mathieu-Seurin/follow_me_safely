@@ -386,6 +386,22 @@ class TextWorldWrapper(gym.Wrapper):
         internal_game = self.env.env.textworld_env._wrapped_env.game_state._env.game
         obj_list = internal_game.objects_names_and_types
 
+        # Cleaning obj list because 'type 1 safe' => 'safe'
+        for obj_id in range(len(obj_list)):
+            if 'type ' in obj_list[obj_id][0]:
+                elem = obj_list[obj_id][0] # obj_list[obj_id] is a tuple (obj_name: str, obj_type: str)
+                elem = elem.split()
+
+                type_idx = elem.index('type')
+                elem.pop(type_idx+1) # Delete number
+                elem.pop(type_idx) # Delete type
+
+                elem = ' '.join(elem)
+                obj_list[obj_id] = (elem, obj_list[obj_id][1])
+
+        # Delete double
+        obj_list = list(set(obj_list))
+
         # Some type are subclasses of other type, need to add them
         additionnal_obj = []
         for obj in obj_list:
@@ -475,7 +491,11 @@ class TextWorldWrapper(gym.Wrapper):
 
         if self._last_state['raw']['admissible_commands'] == state['raw']['admissible_commands']:
             state['gave_feedback'] = True
-            assert action not in self._last_state['raw']['admissible_commands'], "Problem, action should have done something"
+
+            # Check that the action was really useless
+            assert action == 'inventory' or 'examine' in action \
+                   or action not in self._last_state['raw']['admissible_commands'], \
+                "Problem, action should have done something"
         else:
             state['gave_feedback'] = False
 
