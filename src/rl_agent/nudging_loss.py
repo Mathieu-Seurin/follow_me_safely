@@ -1,19 +1,10 @@
-import torch
+import torch.nn.functional as F
 from rl_agent.gpu_utils import TORCH_DEVICE
 
+import copy
+import torch
 
-def consistency_loss_dqfd(next_qs_target, next_qs, regression_loss):
-    """
-    This loss enforce next_q to be consistent with target network, to avoid over-generalization
-    """
-    assert next_qs_target.requires_grad == False, "qs_target should be a reference, requires_grad should be false, is {}".format(next_qs_target.requires_grad)
-    assert next_qs.requires_grad == True, "next_qs requires_grad should be True, is {}".format(next_qs.requires_grad)
-
-    assert next_qs_target.size() == next_qs.size()
-
-    return regression_loss(next_qs_target, next_qs)
-
-def feedback_bad_to_min_when_max(qs, action, feedback, margin, regression_loss, classif_net=None):
+def feedback_bad_to_min_when_max(qs, action, feedback, margin, regression_loss, feedback_logits=None, ceil=None):
     """
     Compute the expert loss when action is flagged as bad AND is the max q
 
@@ -73,7 +64,7 @@ def feedback_bad_to_min_when_max(qs, action, feedback, margin, regression_loss, 
     return loss
 
 
-def feedback_bad_to_min(qs, action, feedback, margin, regression_loss, classif_net=None):
+def feedback_bad_to_min(qs, action, feedback, margin, regression_loss, feedback_logits=None, ceil=0.1):
     """
     Compute the expert loss
 
@@ -120,7 +111,7 @@ def feedback_bad_to_min(qs, action, feedback, margin, regression_loss, classif_n
     loss = regression_loss(min_qs_minus_margin, qs_a_where_bad) # Bring bad action down under margin
     return loss
 
-def feedback_bad_to_percent_max(qs, action, feedback, margin, regression_loss, classif_net=None):
+def feedback_bad_to_percent_max(qs, action, feedback, margin, regression_loss, feedback_logits=None):
     """
     VERSION 4 : Applied only when Q(s,ab) is close to the max Q by a certain margin in % instead of absolute value
 
@@ -176,7 +167,7 @@ def feedback_bad_to_percent_max(qs, action, feedback, margin, regression_loss, c
     return loss
 
 
-def feedback_frontier_margin(qs, action, feedback, margin, regression_loss, testing=False, classif_net=None):
+def feedback_frontier_margin(qs, action, feedback, margin, regression_loss, testing=False, feedback_logits=None, ceil=None):
     """
     Compute the expert loss
 
@@ -230,8 +221,12 @@ def feedback_frontier_margin(qs, action, feedback, margin, regression_loss, test
 
     return loss_good + loss_bad
 
+def compute_entropy_loss(x):
+    loss = F.softmax(x, dim=1) * F.log_softmax(x, dim=1)
+    return loss.mean()
 
-def feedback_frontier_margin_learnt_feedback(qs, action, feedback, margin, regression_loss, testing=False, classif_net=None):
+
+def feedback_frontier_margin_learnt_feedback(qs, action, feedback, margin, regression_loss, testing=False, feedback_logits=None, ceil=0.1):
     """
     Compute the expert loss
 
@@ -241,16 +236,23 @@ def feedback_frontier_margin_learnt_feedback(qs, action, feedback, margin, regre
     # if feedback.mean() in [0,1]:
     #     return 0
 
-    return 0
+    # todo : stats on percent change
 
-    assert classif_net != None, "Need a classification network in 'learnt_feedback_loss'"
+    assert feedback_logits is not None, "Need logits from the classification network"
 
     n_action = qs.size(1)
 
-    qs_a = qs.gather(1, action)
+    almost_sure_positive_feedback = copy.deepcopy(feedback_logits)
+    almost_sure_no_feedback = copy.deepcopy(feedback_logits)
 
-    qs_a_where_good = qs_a[feedback == 0]
-    qs_a_where_bad = qs_a[feedback == 1]
+    # Feedback (either positive or negative) that is not completely sure, don't touch it.
+    almost_sure_positive_feedback[feedback_logits < ceil] = feedback_logits.min()
+    almost_sure_no_feedback[feedback_logits < - ceil] = feedback_logits.max()
+
+    # check if at least there are affirmative feedback per line
+    at_least_one_positive_per_line = torch.all((almost_sure_positive_feedback == feedback_logits).sum(dim=1).type(torch.uint8))
+    at_least_one_negative_per_line = torch.all((almost_sure_negative_feedback == feedback_logits).sum(dim=1).type(torch.uint8))
+
 
     # Compute frontier with margin
     min_good = torch.min(qs_a_where_good) - margin
@@ -288,12 +290,6 @@ def feedback_frontier_margin_learnt_feedback(qs, action, feedback, margin, regre
         loss_bad = regression_loss(qs_a_where_bad_above_min, min_good_vec)
 
     return loss_good + loss_bad
-
-
-
-def learn_feedback_loss(classif_net, feedback_batch):
-    pass
-
 
 
 if __name__ == "__main__":

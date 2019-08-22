@@ -5,10 +5,12 @@
   "dqn_params": {
 
     "learning_rate": [5e-4, 1e-4],
-    "update_every_n_ep" : [20, 40],
+    "update_every_n_ep" : [10, 40],
+
+    "entropy_loss_weight" : [1, 0.5, 0.1, 0.01, 0.001],
 
     "nudging_margin" : [0, 0.01, 0.1, 1],
-    "nudging_loss_weight" : [0.001, 0.01, 0.1, 0.2, 0.5, 1],
+    "nudging_loss_weight" : [0.001, 0.01, 0.1, 0.5, 1],
     "nudging_type" : ["max"]
   }
 }

@@ -5,13 +5,13 @@
   "dqn_params": {
 
     "learning_rate": [5e-4, 1e-4],
-    "update_every_n_ep" : [20, 40, 60],
+    "update_every_n_ep" : [10, 40],
 
-    "batch_size" : [128, 512],
+    "entropy_loss_weight" : [1, 0.5, 0.1, 0.01, 0.001],
 
-    "nudging_margin" : [1, 0.5, 0.1, 0],
-    "nudging_loss_weight" : [0.01, 0.1, 0.5, 1, 2, 4, 10],
-    "nudging_type" : ["frontier"],
-    "clip_grad" : [true]
+    "nudging_margin" : [1, 0.1, 0.01, 0],
+    "nudging_loss_weight" : [0.01, 0.1, 0.5, 1, 2],
+    "nudging_type" : ["frontier"]
+
   }
 }

@@ -53,6 +53,8 @@
 
     "q_loss_weight" : 1,
 
+    "entropy_loss_weight" : 0,
+
     "nudging_margin" : 0,
     "nudging_loss_weight" : 0,
     "nudging_type" : "none",

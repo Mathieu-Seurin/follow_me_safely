@@ -1,7 +1,8 @@
 from rl_agent.agent_utils import Transition, ReplayMemory, ProportionReplayMemory
 
-from rl_agent.nudging_loss import feedback_bad_to_min_when_max, consistency_loss_dqfd,\
-    feedback_bad_to_percent_max, feedback_bad_to_min, feedback_frontier_margin, feedback_frontier_margin_learnt_feedback
+from rl_agent.nudging_loss import feedback_bad_to_min_when_max, \
+    feedback_bad_to_percent_max, feedback_bad_to_min, feedback_frontier_margin, \
+    feedback_frontier_margin_learnt_feedback, compute_entropy_loss
 
 import torch
 import torch.nn.functional as F
@@ -30,6 +31,7 @@ class DQNAgent(object):
         self.percent_feedback_logger = []
         self.action_classif_f1_logger = []
         self.action_classif_random_score_logger = []
+        self.entropy_loss_logger = []
 
         self.discount_factor = discount_factor
         self.n_action = action_space.n
@@ -83,6 +85,8 @@ class DQNAgent(object):
             else:
                 raise NotImplementedError("Wrong nudging loss, {}".format(loss_type))
 
+        self.use_entropy_loss = config["entropy_loss_weight"] > 0
+        self.entropy_loss_weight = config["entropy_loss_weight"]
 
         # ========== Model ===============
 
@@ -100,6 +104,7 @@ class DQNAgent(object):
         self.target_net.load_state_dict(self.policy_net.state_dict())
         self.target_net.eval()
 
+        self.classif_feedback_net = None
         if self.learn_feedback:
             self.classif_feedback_net = Model(config["model_params"], action_space=action_space, obs_space=obs_space).to(TORCH_DEVICE)
             self.classif_feedback_loss = torch.nn.SoftMarginLoss()
@@ -203,21 +208,21 @@ class DQNAgent(object):
 
     def train_feedback_classif(self, state_batch, action_batch, feedback_batch):
 
-        out = self.classif_feedback_net.forward(state_batch)
-        out = torch.tanh(out) # Pass the output through a sigmoid
+        output = self.classif_feedback_net.forward(state_batch)
+        output = torch.tanh(output)
 
-        out = out.gather(1, action_batch)
+        feedback_per_action_logits = output.gather(1, action_batch)
 
         changed_label_feedback_batch = torch.ones_like(feedback_batch)
         changed_label_feedback_batch[feedback_batch == 0] = -1 # convert to pytorch label
 
-        loss = self.classif_feedback_loss(out, changed_label_feedback_batch)
+        loss = self.classif_feedback_loss(feedback_per_action_logits, changed_label_feedback_batch)
 
         self.classif_feedback_optim.zero_grad()
         loss.backward()
         self.classif_feedback_optim.step()
 
-        return loss.item(), out
+        return loss.item(), feedback_per_action_logits.detach().view(-1).cpu(), output.detach().cpu()
 
 
     def optimize(self, total_iter):
@@ -263,22 +268,23 @@ class DQNAgent(object):
             # Since the model is separated from the rl, can be learnt remotly
             # The train optimizes the model already
             ###########
-            supervised_loss, logits = self.train_feedback_classif(state_batch=state_batch,
-                                                                  feedback_batch=feedback_batch,
-                                                                  action_batch=action_batch)
+            supervised_loss, feedback_classif_logits_per_action, feedback_classif_logits = self.train_feedback_classif(state_batch=state_batch,
+                                                                                                                       feedback_batch=feedback_batch,
+                                                                                                                       action_batch=action_batch)
 
-            logits[logits <= 0] = 0
-            logits[logits > 0] = 1
+            rounded_feedback_logits = np.zeros(feedback_classif_logits_per_action.shape[0])
 
-            supervised_f1_score = f1_score(y_true=feedback_batch.cpu(), y_pred=logits.detach().cpu())
+            #rounded_feedback_logits[feedback_classif_logits_per_action <= 0] = 0
+            rounded_feedback_logits[feedback_classif_logits_per_action.numpy() > 0] = 1
+
+            supervised_f1_score = f1_score(y_true=feedback_batch.cpu().view(-1), y_pred=rounded_feedback_logits)
             random_accuracy = feedback_batch.mean().item()
 
             self.action_classif_f1_logger.append(supervised_f1_score)
             self.action_classif_random_score_logger.append(random_accuracy)
 
-            #print("Supervised F1 score : {}\nAccuracy_random : {}".format(supervised_f1_score,random_accuracy))
-
-
+        else:
+            feedback_classif_logits = None
 
 
         state_action_values = state_values.gather(1, action_batch)
@@ -313,19 +319,39 @@ class DQNAgent(object):
         q_loss = F.smooth_l1_loss(state_action_values, expected_state_action_values)
 
         nudging_loss_weighted = 0
+        nudging_loss_to_log = 0
         if self.use_nudging_loss:
             nudging_loss = self.nudging_loss(qs=state_values,
                                              action=action_batch,
                                              feedback=feedback_batch,
                                              margin=self.nudging_loss_margin,
-                                             regression_loss=self.regression_loss
+                                             regression_loss=self.regression_loss,
+                                             feedback_logits=feedback_classif_logits
                                              )
 
             nudging_loss_weighted = nudging_loss * self.nudging_loss_weight
 
+            if nudging_loss_weighted != 0:
+                nudging_loss_to_log = nudging_loss_weighted.detach().item()
+                assert nudging_loss_weighted.requires_grad == True
+
+
+
+        entropy_loss_weighted = 0
+        entropy_loss_to_log = 0
+        # To avoid spikes in Q func, add an entropy regularizer term
+        if self.use_entropy_loss:
+            entropy_loss = compute_entropy_loss(state_values)
+            entropy_loss_weighted = entropy_loss * self.entropy_loss_weight
+            entropy_loss_to_log = entropy_loss_weighted.detach().item()
+
+            if entropy_loss_weighted != 0:
+                entropy_loss_to_log = entropy_loss_weighted.detach().item()
+                assert entropy_loss_weighted.requires_grad == True
+
 
         # Compute the sum of all losses
-        loss = q_loss * self.q_loss_weight + nudging_loss_weighted
+        loss = q_loss * self.q_loss_weight + nudging_loss_weighted + entropy_loss_weighted
 
         # Optimize the model
         self.optimizer.zero_grad()
@@ -339,15 +365,8 @@ class DQNAgent(object):
 
         self.optimizer.step()
 
-        try:
-            nudging_loss_weighted = nudging_loss_weighted.item()
-        except AttributeError:
-            nudging_loss_weighted = 0
-
-        # feedback_loss_weighted = feedback_loss_weighted.item() if isinstance(feedback_loss_weighted,
-        #                                                                      torch.Tensor) else 0
-
-        self.feedback_loss_logger.append(nudging_loss_weighted)
+        self.entropy_loss_logger.append(entropy_loss_to_log)
+        self.feedback_loss_logger.append(nudging_loss_to_log)
         self.q_loss_logger.append(q_loss.item())
         self.percent_feedback_logger.append(feedback_batch.mean().item())
 
@@ -366,11 +385,16 @@ class DQNAgent(object):
                 self.summary_writer.add_scalar("data/action_classif_random_f1_score",
                                                np.mean(self.action_classif_random_score_logger), total_iter)
 
+            if self.use_entropy_loss:
+                self.summary_writer.add_scalar("data/entropy_loss_logger",
+                                               np.mean(self.entropy_loss_logger), total_iter)
+
             self.action_classif_f1_logger = []
             self.feedback_loss_logger = []
             self.q_loss_logger = []
             self.percent_feedback_logger = []
             self.action_classif_random_score_logger = []
+            self.entropy_loss_logger = []
 
         self.num_optim_dqn += 1
 

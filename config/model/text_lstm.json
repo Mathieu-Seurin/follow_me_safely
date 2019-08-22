@@ -24,7 +24,7 @@
 
     "clamp_grad": true,
     "optimizer": "rmsprop",
-    "learning_rate": 5e-4,
+    "learning_rate": 1e-3,
     "weight_decay" : 0,
 
     "batch_size": 256 ,
@@ -40,7 +40,7 @@
 
     "biased_sampling" : false,
 
-    "update_every_n_ep" : 40,
+    "update_every_n_ep" : 60,
 
     "clip_grad" : true,
     "apply_loss_to_target" : false,
@@ -52,6 +52,7 @@
     "boostrap_feedback" : true,
 
     "q_loss_weight" : 1,
+    "entropy_loss_weight" : 0,
 
     "nudging_margin" : 0,
     "nudging_loss_weight" : 0,

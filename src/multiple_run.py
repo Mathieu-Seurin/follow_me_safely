@@ -6,6 +6,8 @@ import time
 import json
 import ray
 
+from random import shuffle
+
 import os
 from config import read_multiple_ext_file, read_multiple_config_file, create_grid_search_config, extend_multiple_seed, read_run_directory_again
 
@@ -65,6 +67,8 @@ if __name__ == "__main__":
     ray.init(num_gpus=args.n_gpus)
 
     print("Number of expe to launch : {}".format(len(configs)))
+
+    shuffle(configs)
 
     if args.out_dir:
         for config in configs:

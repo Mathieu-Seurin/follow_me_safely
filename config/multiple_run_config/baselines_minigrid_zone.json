@@ -7,8 +7,7 @@
 
   "env_ext" : [
     "punish0.1.json",
-    "punish1.json",
-    "punish10.json"
+    "punish1.json"
   ],
 
   "model_ext" :
@@ -16,17 +15,13 @@
             "target_up10_lr0_001.json",
             "target_up20_lr0_001.json",
             "target_up40_lr0_001.json",
-            "target_up60_lr0_001.json",
 
             "target_up10_lr0_0005.json",
             "target_up20_lr0_0005.json",
             "target_up40_lr0_0005.json",
-            "target_up60_lr0_0005.json",
 
             "target_up10_lr0_0001.json",
             "target_up20_lr0_0001.json",
-            "target_up40_lr0_0001.json",
-            "target_up60_lr0_0001.json"
-
+            "target_up40_lr0_0001.json"
           ]
 }

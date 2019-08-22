@@ -1,5 +1,5 @@
 {
-  "name": "Minigrid-safe-size7_zone7",
+  "name": "Minigrid-safe-size7_zone5",
 
   "size_env" : 7,
   "n_frameskip" : 3,
@@ -8,7 +8,7 @@
   "reward_when_out" : 0,
   "feedback_when_wall_hit" : 0,
 
-  "n_zone" : 2,
+  "n_zone" : 5,
 
   "good_zone_action_proba" : 1,
   "bad_zone_action_proba" : 0,

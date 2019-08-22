@@ -12,7 +12,7 @@ import numpy as np
 
 import gym
 
-@ray.remote(num_gpus=0.50)
+@ray.remote(num_gpus=0.15)
 def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_test, override_expe=True, save_images=False):
     import argparse
 
@@ -346,7 +346,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
                 reward_wo_feedback_list[-1], np.mean(feedback_per_ep_list[-1])))
 
 
-            assert total_iter > reward_wo_feedback_list[-1] + feedback_per_ep_list[-1]
+            assert total_iter >= reward_wo_feedback_list[-1] + feedback_per_ep_list[-1]
 
             if reward_total_discounted > score_success:
                 success_count += 1

@@ -2,7 +2,7 @@
   "common" : {
     "env_config" : "text_base.json",
     "model_config" : "text_lstm.json",
-    "env_ext" : "text_10.json",
+    "env_ext" : "text_20.json",
 
     "seed" : 43
   },
@@ -16,9 +16,6 @@
             "target_up60_lr0_0005.json",
 
             "target_up40_lr0_0001.json",
-            "target_up60_lr0_0001.json",
-
-            "target_up40_lr0_00001.json",
-            "target_up60_lr0_00001.json"
+            "target_up60_lr0_0001.json"
           ]
 }

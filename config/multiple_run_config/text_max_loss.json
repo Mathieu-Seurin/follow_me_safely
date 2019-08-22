@@ -1,12 +1,12 @@
 {
   "model_config" : "text_lstm.json",
   "env_config" : "text_base.json",
-  "env_ext" : "text_10.json",
+  "env_ext" : "text_20.json",
 
   "dqn_params": {
 
-    "learning_rate": [5e-4, 1e-4],
-    "update_every_n_ep" : [5, 10, 20, 40],
+    "learning_rate": [1e-4, 1e-3],
+    "update_every_n_ep" : [40, 60],
 
     "nudging_margin" : [0, 0.01, 0.1, 1],
     "nudging_loss_weight" : [0.001, 0.01, 0.1, 0.5, 1],

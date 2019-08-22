@@ -493,9 +493,9 @@ class TextWorldWrapper(gym.Wrapper):
             state['gave_feedback'] = True
 
             # Check that the action was really useless
-            assert action == 'inventory' or 'examine' in action \
+            assert action in ['inventory', 'look'] or 'examine' in action \
                    or action not in self._last_state['raw']['admissible_commands'], \
-                "Problem, action should have done something"
+                "Problem, action should have done something, action was {}".format(action)
         else:
             state['gave_feedback'] = False
 
