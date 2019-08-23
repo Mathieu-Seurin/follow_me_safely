@@ -81,6 +81,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
 
 
     writer = tensorboardX.SummaryWriter(expe_path)
+    print("Expe path : ", expe_path)
 
     if "racing" in full_config["env_name"].lower():
 

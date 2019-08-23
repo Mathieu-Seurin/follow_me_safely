@@ -69,6 +69,7 @@ class DQNAgent(object):
         if self.use_nudging_loss:
             self.nudging_loss_weight = config["nudging_loss_weight"]
             self.nudging_loss_margin = config["nudging_margin"]
+            self.certainty_ceil = config["certainty_ceil_classif"]
 
             loss_type = config["nudging_type"]
             if loss_type == "max":
@@ -246,7 +247,7 @@ class DQNAgent(object):
         # Compute a mask of non-final states and concatenate the batch elements
         # (a final state would've been the one after which simulation ended)
         non_final_mask = torch.tensor(tuple(map(lambda s: s is not None,
-                                                batch.next_state)), device=TORCH_DEVICE, dtype=torch.uint8)
+                                                batch.next_state)), device=TORCH_DEVICE, dtype=torch.bool)
 
         if not self.boostrap_feedback:
             no_feed_batch = feedback_batch == 0
@@ -326,7 +327,8 @@ class DQNAgent(object):
                                              feedback=feedback_batch,
                                              margin=self.nudging_loss_margin,
                                              regression_loss=self.regression_loss,
-                                             feedback_logits=feedback_classif_logits
+                                             feedback_logits=feedback_classif_logits,
+                                             ceil=self.certainty_ceil
                                              )
 
             nudging_loss_weighted = nudging_loss * self.nudging_loss_weight

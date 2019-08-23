@@ -59,7 +59,7 @@
     "nudging_loss_weight" : 0,
     "nudging_type" : "none",
 
-    "supervised_loss_weight" : 0
-
+    "classif_learning_rate" : 3e-4,
+    "certainty_ceil_classif" : 0
   }
 }
