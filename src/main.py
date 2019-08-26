@@ -1,3 +1,5 @@
+# coding: utf8
+
 import ray
 import os
 import matplotlib
@@ -12,8 +14,8 @@ import numpy as np
 
 import gym
 
-@ray.remote(num_gpus=0.15)
-def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_test, override_expe=True, save_images=False):
+@ray.remote(num_gpus=0.49)
+def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_test, override_expe=True, save_n_random_q_images=0):
     import argparse
 
     from rl_agent.agent_utils import render_state_and_q_values
@@ -65,15 +67,21 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
             if "tfevents" in dir:
                 tf_event_path = os.path.join(expe_path,dir)
 
-                for i, elem in enumerate(tf.train.summary_iterator(tf_event_path)):
-                    if elem.step:
-                        last_iter = max(last_iter, elem.step)
+                try:
+                    for i, elem in enumerate(tf.train.summary_iterator(tf_event_path)):
+                        if elem.step:
+                            last_iter = max(last_iter, elem.step)
 
-                if last_iter < max_iter_expe - log_stats_every:
-                    os.remove(tf_event_path)
+                    if last_iter < max_iter_expe - log_stats_every:
+                        os.remove(tf_event_path)
+                        print("Experiment doesn't seem to be over, rerun.")
+                    else:
+                        rerun_expe = False
+
+                except tf.errors.DataLossError as e:
+                    print(e)
                     print("Experiment doesn't seem to be over, rerun.")
-                else:
-                    rerun_expe = False
+                    os.remove(tf_event_path)
 
         if rerun_expe == False:
             print("Expe was over, don't rerun")
@@ -217,15 +225,18 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
             rendered_images = []
 
             # Do we store images of state and q function associated with it ?
-            if save_images and (num_episode in save_images_at):
-                save_images_and_q_this_ep = True
+            if save_n_random_q_images > 0:
+                steps_images_to_save = np.random.randint(0, game.env.max_steps, save_n_random_q_images)
+            elif num_episode in save_images_at:
+                steps_images_to_save = range(0, int(1e6)) # save everything
             else:
-                save_images_and_q_this_ep = False
+                steps_images_to_save = []
+
 
             while not done:
 
                 # Render state, and compute q values to visualize them later
-                if save_images_and_q_this_ep:
+                if iter_this_ep in steps_images_to_save:
                     array_rendered = render_state_and_q_values(model=model, game=game, state=state)
                     rendered_images.append(array_rendered)
 
@@ -240,7 +251,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
                     next_state['state'] = None
 
                 model.push(state['state'], action, next_state['state'], reward, next_state['gave_feedback'])
-                model.optimize(total_iter=total_iter)
+                model.optimize(total_iter=total_iter, env=game)
 
                 state = next_state
 
@@ -316,7 +327,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
             # ================
 
             # Save images of state and q func associated
-            if save_images_and_q_this_ep:
+            if rendered_images != []:
                 for i, array_rendered in enumerate(rendered_images):
                     num_iter = iter_this_ep - len(rendered_images) + i + 1
                     writer.add_image('data/{}/state_and_q'.format(num_episode), global_step=num_iter,
@@ -393,7 +404,7 @@ if __name__ == "__main__":
                              args.seed,
                              args.local_test,
                              override_expe=False,
-                             save_images=True))
+                             save_n_random_q_images=2))
 
     print(a)
 

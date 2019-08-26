@@ -60,6 +60,9 @@
     "nudging_type" : "none",
 
     "classif_learning_rate" : 3e-4,
-    "certainty_ceil_classif" : 0
+    "certainty_ceil_classif" : 0,
+    "use_true_label_for_frontier" : false
+
+
   }
 }

@@ -83,6 +83,8 @@ class DQNAgent(object):
             elif loss_type == "frontier_feedback_learnt":
                 self.learn_feedback = True
                 self.nudging_loss = feedback_frontier_margin_learnt_feedback
+                self.use_true_labels = config["use_true_label_for_frontier"]
+
             else:
                 raise NotImplementedError("Wrong nudging loss, {}".format(loss_type))
 
@@ -226,7 +228,7 @@ class DQNAgent(object):
         return loss.item(), feedback_per_action_logits.detach().view(-1).cpu(), output.detach().cpu()
 
 
-    def optimize(self, total_iter):
+    def optimize(self, total_iter, env=None):
 
         if len(self.memory) < self.batch_size:
             if self.summary_writer and total_iter % self.log_stats_every == 0:
@@ -265,27 +267,38 @@ class DQNAgent(object):
         state_values = self.policy_net(state_batch)
 
         if self.learn_feedback:
-            ###########
-            # Since the model is separated from the rl, can be learnt remotly
-            # The train optimizes the model already
-            ###########
-            supervised_loss, feedback_classif_logits_per_action, feedback_classif_logits = self.train_feedback_classif(state_batch=state_batch,
-                                                                                                                       feedback_batch=feedback_batch,
-                                                                                                                       action_batch=action_batch)
 
-            rounded_feedback_logits = np.zeros(feedback_classif_logits_per_action.shape[0])
+            if self.use_true_labels:
 
-            #rounded_feedback_logits[feedback_classif_logits_per_action <= 0] = 0
-            rounded_feedback_logits[feedback_classif_logits_per_action.numpy() > 0] = 1
+                self.action_classif_f1_logger.append(1.0)
+                self.action_classif_random_score_logger.append(1.0)
 
-            y_true = feedback_batch.cpu().view(-1)
-            random_f1 = feedback_batch.mean().item()
+                feedback_classif_logits, _ = env.get_feedback_actions(state_batch.cpu())
+                feedback_classif_logits = torch.tensor(feedback_classif_logits)
 
-            supervised_f1_score = f1_score(y_true=y_true, y_pred=rounded_feedback_logits)
-            random_f1 = f1_score(y_true=y_true, y_pred = np.random.choice([0,1], p=[1-random_f1, random_f1]))
+            else:
 
-            self.action_classif_f1_logger.append(supervised_f1_score)
-            self.action_classif_random_score_logger.append(random_f1)
+                ###########
+                # Since the model is separated from the rl, can be learnt remotly
+                # The train optimizes the model already
+                ###########
+                supervised_loss, feedback_classif_logits_per_action, feedback_classif_logits = self.train_feedback_classif(state_batch=state_batch,
+                                                                                                                           feedback_batch=feedback_batch,
+                                                                                                                           action_batch=action_batch)
+
+                rounded_feedback_logits = np.zeros(feedback_classif_logits_per_action.shape[0])
+
+                #rounded_feedback_logits[feedback_classif_logits_per_action <= 0] = 0
+                rounded_feedback_logits[feedback_classif_logits_per_action.numpy() > 0] = 1
+
+                y_true = feedback_batch.cpu().view(-1)
+                random_f1 = feedback_batch.mean().item()
+
+                supervised_f1_score = f1_score(y_true=y_true, y_pred=rounded_feedback_logits)
+                random_f1 = f1_score(y_true=y_true, y_pred = np.random.choice([0,1], p=[1-random_f1, random_f1], size=y_true.shape))
+
+                self.action_classif_f1_logger.append(supervised_f1_score)
+                self.action_classif_random_score_logger.append(random_f1)
 
         else:
             feedback_classif_logits = None

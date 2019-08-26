@@ -262,7 +262,7 @@ def feedback_frontier_margin_learnt_feedback(qs, action=None, feedback=None, mar
     certainty_percentage_feed = (at_least_one_feedback_per_line.float() / n_actions).mean()
     certainty_percentage_no_feed = (at_least_one_nofeedback_per_line.float() / n_actions).mean()
 
-    both_per_line = at_least_one_feedback_per_line + at_least_one_nofeedback_per_line > 0
+    both_per_line = at_least_one_feedback_per_line + at_least_one_nofeedback_per_line > 1
 
     qs = qs[both_per_line, :]
     if qs.size(0) == 0:

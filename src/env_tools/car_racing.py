@@ -1,20 +1,20 @@
 import sys, math
 import numpy as np
 
-import Box2D
-from Box2D.b2 import (edgeShape, circleShape, fixtureDef, polygonShape, revoluteJointDef, contactListener)
-from Box2D import b2Vec2
+# import Box2D
+# from Box2D.b2 import (edgeShape, circleShape, fixtureDef, polygonShape, revoluteJointDef, contactListener)
+# from Box2D import b2Vec2
 
 import gym
 from gym import spaces
-from gym.envs.box2d.car_dynamics import Car
+# from gym.envs.box2d.car_dynamics import Car
 from gym.utils import colorize, seeding, EzPickle
 
 import pyglet
 from pyglet import gl
-
-import matplotlib.pyplot as plt
-from skimage import color
+#
+# import matplotlib.pyplot as plt
+# from skimage import color
 
 # Easiest continuous control task to learn from pixels, a top-down racing environment.
 # Discreet control is reasonable in this environment as well, on/off discretisation is

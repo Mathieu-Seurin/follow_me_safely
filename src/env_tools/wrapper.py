@@ -5,7 +5,7 @@ from collections import OrderedDict
 from itertools import product
 from skimage import color
 
-from env_tools.car_racing import CarRacingSafe
+#from env_tools.car_racing import CarRacingSafe
 
 from gym_minigrid.envs.safe_crossing import SafeCrossing
 from gym_minigrid.minigrid import COLORS
@@ -237,6 +237,20 @@ class MinigridFrameStacker(gym.Wrapper):
         observation_space['state'] = gym.spaces.Box(low=0, high=len(COLORS), shape=(3*n_frameskip, 7, 7))
         self.observation_space = gym.spaces.Dict(observation_space)
 
+    def get_feedback_actions(self, states):
+        zone_per_state = np.maximum(states[:,1,4, -1], states[:,1,2, -1]) - 1
+
+        feedback_list = []
+        for zone in zone_per_state:
+            feedback_list.append([])
+            for action in range(len(self.env.action_to_zone.keys())):
+                if self.env.action_to_zone[action] == zone:
+                    feedback_list[-1].append(-1)
+                else:
+                    feedback_list[-1].append(1)
+
+        return np.array(feedback_list), zone_per_state
+
     def _unconvert(self, state):
         x = self.render("rgb_array")
         return x
@@ -261,6 +275,7 @@ class MinigridFrameStacker(gym.Wrapper):
         new_obs['gave_feedback'] = False
         new_obs['zone'] = self.env.current_zone_num
 
+        assert self.get_feedback_actions(np.expand_dims(new_obs['state'],0))[1][0] == self.env.current_zone_num
         assert self.observation_space.contains(new_obs), "Observation don't match observation space"
         return new_obs
 
@@ -273,6 +288,7 @@ class MinigridFrameStacker(gym.Wrapper):
         new_obs['gave_feedback'] = obs['gave_feedback']
         new_obs['zone'] = obs['zone']
 
+        assert self.get_feedback_actions(np.expand_dims(new_obs['state'],0))[1][0] == self.env.current_zone_num
         assert self.observation_space.contains(new_obs), "Problem, observation don't match observation space."
         return new_obs, reward, done, info
 
