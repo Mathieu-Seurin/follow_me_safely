@@ -278,11 +278,14 @@ class DQNAgent(object):
             #rounded_feedback_logits[feedback_classif_logits_per_action <= 0] = 0
             rounded_feedback_logits[feedback_classif_logits_per_action.numpy() > 0] = 1
 
-            supervised_f1_score = f1_score(y_true=feedback_batch.cpu().view(-1), y_pred=rounded_feedback_logits)
-            random_accuracy = feedback_batch.mean().item()
+            y_true = feedback_batch.cpu().view(-1)
+            random_f1 = feedback_batch.mean().item()
+
+            supervised_f1_score = f1_score(y_true=y_true, y_pred=rounded_feedback_logits)
+            random_f1 = f1_score(y_true=y_true, y_pred = np.random.choice([0,1], p=[1-random_f1, random_f1]))
 
             self.action_classif_f1_logger.append(supervised_f1_score)
-            self.action_classif_random_score_logger.append(random_accuracy)
+            self.action_classif_random_score_logger.append(random_f1)
 
         else:
             feedback_classif_logits = None

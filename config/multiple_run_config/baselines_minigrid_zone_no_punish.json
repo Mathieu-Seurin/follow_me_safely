@@ -1,0 +1,22 @@
+{
+  "common" : {
+    "env_config" : "safe_minigrid_7_zone.json",
+    "model_config" : "cnn_grid.json",
+    "seed" : 43
+  },
+
+  "model_ext" :
+          [
+            "target_up10_lr0_001.json",
+            "target_up20_lr0_001.json",
+            "target_up40_lr0_001.json",
+
+            "target_up10_lr0_0005.json",
+            "target_up20_lr0_0005.json",
+            "target_up40_lr0_0005.json",
+
+            "target_up10_lr0_0001.json",
+            "target_up20_lr0_0001.json",
+            "target_up40_lr0_0001.json"
+          ]
+}

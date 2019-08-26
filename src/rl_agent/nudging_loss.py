@@ -265,11 +265,11 @@ def feedback_frontier_margin_learnt_feedback(qs, action=None, feedback=None, mar
     both_per_line = at_least_one_feedback_per_line + at_least_one_nofeedback_per_line > 0
 
     qs = qs[both_per_line, :]
-    almost_sure_no_feedback = almost_sure_no_feedback[both_per_line, :]
-    almost_sure_feedback = almost_sure_feedback[both_per_line, :]
-
     if qs.size(0) == 0:
         return 0
+
+    almost_sure_no_feedback = almost_sure_no_feedback[both_per_line, :]
+    almost_sure_feedback = almost_sure_feedback[both_per_line, :]
 
     qs_feedback = qs.clone().detach() # Q(s,a) for action flagged as "gives feedback" aka bad actions by classification algorithm
     qs_no_feedback = qs.clone().detach() #Q(s,a) for action flagged as "don't give feedback" aka good actions by classification algorithm
