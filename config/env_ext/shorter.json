@@ -1,8 +1,8 @@
 {
-  "name": "shorter400",
+  "name": "shorter10",
 
   "stop" : {
-    "episodes_total" : 400
+    "max_iter_expe" : 2100
   }
 }
 

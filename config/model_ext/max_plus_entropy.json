@@ -1,12 +1,14 @@
 {
-  "name": "max1_margin0.3_entropy0.1",
+  "name": "max1_margin0.3_entropy0",
 
   "dqn_params" : {
-    "nudging_margin" : 1,
-    "nudging_loss_weight" : 0.3,
+    "nudging_margin" : 0.2,
+    "nudging_loss_weight" : 3,
     "nudging_type" : "max",
 
-    "entropy_loss_weight" : 0.1
+    "entropy_loss_weight" : 0,
+
+    "q_loss_weight" : 0
 
 
   }

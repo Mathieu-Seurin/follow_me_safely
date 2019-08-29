@@ -112,7 +112,7 @@ def feedback_bad_to_min(qs, action, feedback, margin, regression_loss, feedback_
     loss = regression_loss(min_qs_minus_margin, qs_a_where_bad) # Bring bad action down under margin
     return loss
 
-def feedback_bad_to_percent_max(qs, action, feedback, margin, regression_loss, feedback_logits=None):
+def feedback_bad_to_percent_max(qs, action, feedback, margin, regression_loss, feedback_logits=None, ceil=None):
     """
     VERSION 4 : Applied only when Q(s,ab) is close to the max Q by a certain margin in % instead of absolute value
 
@@ -132,6 +132,8 @@ def feedback_bad_to_percent_max(qs, action, feedback, margin, regression_loss, f
 
     n_action = qs.size(1)
     LIM_INF = -1e10
+
+    feedback = feedback.view(-1)
 
     # Ignore qs where the action is not flagged as bad
     qs_where_bad = qs[feedback != 0]
@@ -312,26 +314,26 @@ if __name__ == "__main__":
     regr_loss = torch.nn.functional.smooth_l1_loss
     margin = 0.1
 
-    # # Test 1
-    # qs = torch.arange(12).view(4,3).float()
-    # actions = torch.Tensor([0,0,0,0]).long()
-    # feedback = torch.Tensor([1,1,1,0])
-    #
-    # assert feedback_bad_to_min_when_max(qs, actions, feedback, margin, regr_loss) == 0
-    #
-    # # Test 2
-    # qs = torch.arange(12).view(4,3).float()
-    # actions = torch.Tensor([0,0,0,0]).long()
-    # feedback = torch.Tensor([1,1,1,0])
-    # loss1 = feedback_bad_to_min_when_max(qs, actions, feedback, margin, regr_loss)
-    #
-    # qs = torch.arange(12).view(4,3).float()
-    # actions = torch.Tensor([0,1,2,0]).long()
-    # feedback = torch.Tensor([1,1,1,0])
-    # loss2 = feedback_bad_to_min_when_max(qs, actions, feedback, margin, regr_loss)
-    #
-    # assert loss1 < loss2
-    #
+    # Test 1
+    qs = torch.arange(12).view(4,3).float()
+    actions = torch.Tensor([0,0,0,0]).long()
+    feedback = torch.Tensor([1,1,1,0])
+
+    assert feedback_bad_to_min_when_max(qs, actions, feedback, margin, regr_loss) == 0
+
+    # Test 2
+    qs = torch.arange(12).view(4,3).float()
+    actions = torch.Tensor([0,0,0,0]).long()
+    feedback = torch.Tensor([1,1,1,0])
+    loss1 = feedback_bad_to_min_when_max(qs, actions, feedback, margin, regr_loss)
+
+    qs = torch.arange(12).view(4,3).float()
+    actions = torch.Tensor([0,1,2,0]).long()
+    feedback = torch.Tensor([1,1,1,0])
+    loss2 = feedback_bad_to_min_when_max(qs, actions, feedback, margin, regr_loss)
+
+    assert loss1 < loss2
+
     # # Test 3
     # qs = torch.arange(12).view(4, 3).float()
     #

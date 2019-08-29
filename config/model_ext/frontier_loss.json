@@ -1,11 +1,13 @@
 {
-  "name" : "frontier_w0.5_m0.1_up40",
+  "name" : "frontier_w3_m0.1",
 
   "dqn_params" : {
     "learning_rate" : 1e-5,
-    "update_every_n_ep" : 40,
-    "nudging_loss_weight" : 0.5,
+    "nudging_loss_weight" : 3,
     "nudging_margin" : 0.1,
-    "nudging_type" : "frontier"
+    "nudging_type" : "frontier",
+
+    "q_loss_weight" : 1
+
   }
 }

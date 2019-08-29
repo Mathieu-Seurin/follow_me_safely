@@ -14,7 +14,7 @@ import numpy as np
 
 import gym
 
-@ray.remote(num_gpus=0.49)
+@ray.remote(num_gpus=0.20)
 def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_test, override_expe=True, save_n_random_q_images=0):
     import argparse
 
@@ -79,9 +79,10 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
                         rerun_expe = False
 
                 except tf.errors.DataLossError as e:
+                    raise(e)
                     print(e)
                     print("Experiment doesn't seem to be over, rerun.")
-                    os.remove(tf_event_path)
+                    #os.remove(tf_event_path)
 
         if rerun_expe == False:
             print("Expe was over, don't rerun")
@@ -372,6 +373,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
         print("Experiment over")
 
     # Enforce cleaning
+    writer.close()
     del model.memory
     del model
     del game
