@@ -1,5 +1,5 @@
 {
-  "name" : "learn_frontier_w3_m0.1_up40_clf_lr3e-4_ceil08_entropy0_q_loss1",
+  "name" : "learn_frontier_bcloss",
 
   "dqn_params" : {
 
@@ -9,11 +9,15 @@
     "nudging_margin" : 0.1,
     "nudging_type" : "frontier_feedback_learnt",
 
-    "classif_learning_rate" : 3e-4,
+    "classif_learning_rate" : 1e-4,
     "certainty_ceil_classif" : 0.9,
     "entropy_loss_weight" : 0,
+    "use_true_label_for_frontier": false,
+    "classif_feedback_percentage" : 0.5,
+    "steps_to_wait_before_optim" : 5000,
+    "classif_update_per_q_optim" : 1,
+    "classif_weight_decay" : 1e-5,
 
-    "q_loss_weight" : 1,
-    "use_true_label_for_frontier": false
+    "q_loss_weight" : 1
   }
 }

@@ -243,9 +243,8 @@ def feedback_frontier_margin_learnt_feedback(qs, action=None, feedback=None, mar
     m is a margin function
     """
 
-    # todo : stats on percent change
-
-    assert feedback_logits is not None, "Need logits from the classification network"
+    if feedback_logits is None :
+        return 0
     n_actions = qs.size(1)
 
     almost_sure_feedback = torch.zeros(*feedback_logits.size()).to(TORCH_DEVICE)

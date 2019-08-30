@@ -62,10 +62,9 @@ class ReplayMemory(object):
 
 class ProportionReplayMemory(object):
 
-    def __init__(self, proportion, capacity):
+    def __init__(self, capacity):
 
         self.capacity = capacity
-        self.proportion = proportion
 
         self.memory = []
         self.position = 0
@@ -87,46 +86,22 @@ class ProportionReplayMemory(object):
             self.memory[self.position] = Transition(*args)
             self.position = (self.position + 1) % self.capacity
 
-    def sample(self, batch_size):
+    def sample(self, batch_size, proportion=0):
 
-        batch_size_feed = int(batch_size * self.proportion)
+        if proportion == 0:
+            proportion = len(self.memory_feedback) / len(self)
+
+        batch_size_feed = int(batch_size * proportion)
 
         # Sample from memory who stores non-feedback tuple
-        samples = [self.memory[sample] for sample in np.random.choice(len(self.memory), batch_size - batch_size_feed)]
+        samples = [self.memory[sample] for sample in np.random.choice(len(self.memory), batch_size - batch_size_feed, replace=True)]
         # Add sample from feedback tuple
-        samples.extend([self.memory_feedback[sample] for sample in np.random.choice(len(self.memory_feedback), batch_size_feed)])
+        samples.extend([self.memory_feedback[sample] for sample in np.random.choice(len(self.memory_feedback), batch_size_feed, replace=True)])
 
         return samples
 
     def __len__(self):
         return len(self.memory)+len(self.memory_feedback)
-
-
-def orthogonal(tensor, gain=1):
-    if tensor.ndimension() < 2:
-        raise ValueError("Only tensors with 2 or more dimensions are supported")
-
-    rows = tensor.size(0)
-    cols = tensor[0].numel()
-    flattened = torch.Tensor(rows, cols).normal_(0, 1)
-
-    if rows < cols:
-        flattened.t_()
-
-    # Compute the qr factorization
-    q, r = torch.qr(flattened)
-    # Make Q uniform according to https://arxiv.org/pdf/math-ph/0609050.pdf
-    d = torch.diag(r, 0)
-    ph = d.sign()
-    q *= ph.expand_as(q)
-
-    if rows < cols:
-        q.t_()
-
-    tensor.view_as(q).copy_(q)
-    tensor.mul_(gain)
-    return tensor
-
 
 def freeze_as_np_dict(tensor_dict):
     out = {}

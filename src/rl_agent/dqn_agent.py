@@ -29,8 +29,9 @@ class DQNAgent(object):
         self.q_loss_logger = []
         self.feedback_loss_logger = []
         self.percent_feedback_logger = []
-        self.action_classif_f1_logger = []
+        self.action_classif_acc_logger = []
         self.action_classif_random_score_logger = []
+        self.action_classif_loss_logger = []
         self.entropy_loss_logger = []
 
         self.discount_factor = discount_factor
@@ -38,16 +39,15 @@ class DQNAgent(object):
 
         self.lr = config["learning_rate"]
         self.weight_decay = config["weight_decay"]
+        self.classif_weight_decay = config["classif_weight_decay"]
+
         self.batch_size = config["batch_size"]
         self.clip_grad = config["clip_grad"]
         self.q_loss_weight = config["q_loss_weight"]
         self.boostrap_feedback = config["boostrap_feedback"]
 
-        if config["feedback_percentage_in_buffer"] == 0: # no proportionnal, use classical replay buffer
-            self.memory = ReplayMemory(config["memory_size"])
-        else:
-            self.memory = ProportionReplayMemory(proportion=config["feedback_percentage_in_buffer"],
-                                                 capacity=config["memory_size"])
+        self.memory = ProportionReplayMemory(capacity=config["memory_size"])
+        self.q_learning_feedback_percentage = config["feedback_percentage_in_buffer"]
 
         self.update_every_n_ep = config["update_every_n_ep"]
 
@@ -110,12 +110,16 @@ class DQNAgent(object):
         self.classif_feedback_net = None
         if self.learn_feedback:
             self.classif_feedback_net = Model(config["model_params"], action_space=action_space, obs_space=obs_space).to(TORCH_DEVICE)
-            self.classif_feedback_loss = torch.nn.SoftMarginLoss()
+            self.classif_feedback_loss = torch.nn.BCEWithLogitsLoss()
             self.classif_feedback_optim = torch.optim.RMSprop(self.classif_feedback_net.parameters(),
                                                               lr=config["classif_learning_rate"],
                                                               )
 
-        self.optimizer = torch.optim.RMSprop(self.policy_net.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+            self.classif_feedback_percentage = config["classif_feedback_percentage"]
+            self.classif_update_per_q_optim = config["classif_update_per_q_optim"]
+            self.steps_to_wait_before_optim = config["steps_to_wait_before_optim"]
+
+        self.optimizer = torch.optim.Adam(self.policy_net.parameters(), lr=self.lr, weight_decay=self.weight_decay)
 
         if config["exploration_method"] == "eps_greedy":
 
@@ -136,7 +140,7 @@ class DQNAgent(object):
                 self.action_proba = np.ones(self.n_action)
                 self.action_proba /= np.sum(self.action_proba)
 
-        elif config["exploration_method"] == "boltzmann" :
+        elif config["exploration_method"] == "boltzmann":
 
             self._select_action = self._select_action_boltzmann
             self.epsilon_init = config["exploration_params"]["begin_eps"]
@@ -209,23 +213,55 @@ class DQNAgent(object):
             self.target_net.load_state_dict(self.policy_net.state_dict())
             self.num_update_target += 1
 
-    def train_feedback_classif(self, state_batch, action_batch, feedback_batch):
+    def train_feedback_classif(self):
+
+        batch_size = self.batch_size
+
+        for num_update in range(self.classif_update_per_q_optim):
+
+            transitions = self.memory.sample(batch_size, self.classif_feedback_percentage)
+            # Transpose the batch (see https://stackoverflow.com/a/19343/3343043 for
+            # detailed explanation). This converts batch-array of Transitions
+            # to Transition of batch-arrays.
+            batch = Transition(*zip(*transitions))
+
+            state_batch = self.preprocessor(batch.state)
+            action_batch = torch.LongTensor(batch.action)
+            feedback_batch =  torch.FloatTensor(batch.gave_feedback)
+
+            output = self.classif_feedback_net.forward(state_batch)
+            # feedback_per_action_logits = output.gather(1, action_batch)
+            labels = torch.zeros(feedback_per_action_logits)
+            labels[torch.arange(batch_size), action_batch] = feedback_batch.view(-1)
+
+            assert labels.requires_grad == False
+            assert feedback_per_action_logits.requires_grad == True
+            assert labels.shape == feedback_per_action_logits.shape
+            loss = self.classif_feedback_loss(feedback_per_action_logits, feedback_batch)
+
+            self.classif_feedback_optim.zero_grad()
+            loss.backward()
+            self.classif_feedback_optim.step()
+
+            feedback_per_action_logits = feedback_per_action_logits.detach().cpu().view(-1).numpy()
+
+            rounded_feedback_logits = np.zeros_like(feedback_per_action_logits)
+            rounded_feedback_logits[feedback_per_action_logits > 0] = 1
+
+            y_true = feedback_batch.cpu().view(-1)
+            random_acc = feedback_batch.mean().item()
+
+            supervised_acc_score = accuracy_score(y_true=y_true, y_pred=rounded_feedback_logits)
+
+            self.action_classif_acc_logger.append(supervised_acc_score)
+            self.action_classif_random_score_logger.append(random_acc)
+            self.action_classif_loss_logger.append(loss.item())
+
+    def compute_learnt_feedback_logits(self, state_batch):
 
         output = self.classif_feedback_net.forward(state_batch)
-        output = torch.tanh(output)
-
-        feedback_per_action_logits = output.gather(1, action_batch)
-
-        changed_label_feedback_batch = torch.ones_like(feedback_batch)
-        changed_label_feedback_batch[feedback_batch == 0] = -1 # convert to pytorch label
-
-        loss = self.classif_feedback_loss(feedback_per_action_logits, changed_label_feedback_batch)
-
-        self.classif_feedback_optim.zero_grad()
-        loss.backward()
-        self.classif_feedback_optim.step()
-
-        return loss.item(), feedback_per_action_logits.detach().view(-1).cpu(), output.detach().cpu()
+        output = F.sigmoid(output)
+        return output.detach().cpu()
 
 
     def optimize(self, total_iter, env=None):
@@ -235,6 +271,7 @@ class DQNAgent(object):
                 self.summary_writer.add_scalar("data/feedback_loss", 0, total_iter)
                 self.summary_writer.add_scalar("data/q_loss", 0, total_iter)
             return
+
         transitions = self.memory.sample(self.batch_size)
         # Transpose the batch (see https://stackoverflow.com/a/19343/3343043 for
         # detailed explanation). This converts batch-array of Transitions
@@ -266,11 +303,11 @@ class DQNAgent(object):
         # for each batch state according to policy_net
         state_values = self.policy_net(state_batch)
 
-        if self.learn_feedback:
+        if self.learn_feedback and total_iter > self.steps_to_wait_before_optim:
 
             if self.use_true_labels:
 
-                self.action_classif_f1_logger.append(1.0)
+                self.action_classif_acc_logger.append(1.0)
                 self.action_classif_random_score_logger.append(1.0)
 
                 feedback_classif_logits, _ = env.get_feedback_actions(state_batch.cpu())
@@ -278,27 +315,12 @@ class DQNAgent(object):
 
             else:
 
-                ###########
                 # Since the model is separated from the rl, can be learnt remotly
-                # The train optimizes the model already
-                ###########
-                supervised_loss, feedback_classif_logits_per_action, feedback_classif_logits = self.train_feedback_classif(state_batch=state_batch,
-                                                                                                                           feedback_batch=feedback_batch,
-                                                                                                                           action_batch=action_batch)
+                # optimize for N step the classification network
+                self.train_feedback_classif()
 
-                rounded_feedback_logits = np.zeros(feedback_classif_logits_per_action.shape[0])
 
-                #rounded_feedback_logits[feedback_classif_logits_per_action <= 0] = 0
-                rounded_feedback_logits[feedback_classif_logits_per_action.numpy() > 0] = 1
-
-                y_true = feedback_batch.cpu().view(-1)
-                random_f1 = feedback_batch.mean().item()
-
-                supervised_f1_score = f1_score(y_true=y_true, y_pred=rounded_feedback_logits)
-                random_f1 = f1_score(y_true=y_true, y_pred = np.random.choice([0,1], p=[1-random_f1, random_f1], size=y_true.shape))
-
-                self.action_classif_f1_logger.append(supervised_f1_score)
-                self.action_classif_random_score_logger.append(random_f1)
+                feedback_classif_logits = self.compute_learnt_feedback_logits(state_batch=state_batch)
 
         else:
             feedback_classif_logits = None
@@ -397,22 +419,28 @@ class DQNAgent(object):
             # self.summary_writer.add_histogramm("data/q_values", state_values.mean, self.num_update, bins=4)
 
             if self.learn_feedback:
-                self.summary_writer.add_scalar("data/action_classif_f1_score",
-                                               np.mean(self.action_classif_f1_logger), total_iter)
+                self.summary_writer.add_scalar("data/action_classif_acc_score",
+                                               np.mean(self.action_classif_acc_logger), total_iter)
 
-                self.summary_writer.add_scalar("data/action_classif_random_f1_score",
+                self.summary_writer.add_scalar("data/action_classif_random_acc_score",
                                                np.mean(self.action_classif_random_score_logger), total_iter)
+
+                self.summary_writer.add_scalar("data/action_classif_loss_logger",
+                                               np.mean(self.action_classif_loss_logger), total_iter)
+
+
 
             if self.use_entropy_loss:
                 self.summary_writer.add_scalar("data/entropy_loss_logger",
                                                np.mean(self.entropy_loss_logger), total_iter)
 
-            self.action_classif_f1_logger = []
+            self.action_classif_acc_logger = []
             self.feedback_loss_logger = []
             self.q_loss_logger = []
             self.percent_feedback_logger = []
             self.action_classif_random_score_logger = []
             self.entropy_loss_logger = []
+            self.action_classif_loss_logger = []
 
         self.num_optim_dqn += 1
 
