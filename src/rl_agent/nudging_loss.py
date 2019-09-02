@@ -251,8 +251,8 @@ def feedback_frontier_margin_learnt_feedback(qs, action=None, feedback=None, mar
     almost_sure_no_feedback = torch.zeros(*feedback_logits.size()).to(TORCH_DEVICE)
 
     # Feedback (or no feedback) that is almost sure (using a classification network), use them.
-    almost_sure_feedback[feedback_logits > ceil] = 1
-    almost_sure_no_feedback[feedback_logits < - ceil] = 1
+    almost_sure_feedback[feedback_logits > 0.5 + ceil] = 1
+    almost_sure_no_feedback[feedback_logits < 0.5 - ceil] = 1
 
     # check if at least there are "sure" predicted feedback per line
     at_least_one_feedback_per_line = almost_sure_feedback.sum(dim=1).type(torch.uint8)

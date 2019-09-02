@@ -59,13 +59,14 @@
     "nudging_loss_weight" : 0,
     "nudging_type" : "none",
 
-    "classif_learning_rate" : 3e-4,
-    "certainty_ceil_classif" : 0,
+    "classif_learning_rate" : 1e-4,
+    "classif_weight_decay" : 1e-5,
+
+    "certainty_ceil_classif" : 0.4,
     "classif_feedback_percentage" : 0,
     "classif_update_per_q_optim" : 1,
     "use_true_label_for_frontier" : false,
-    "steps_to_wait_before_optim" : 0,
-    "classif_weight_decay" : 0
+    "steps_to_wait_before_optim" : 0
 
 
   }

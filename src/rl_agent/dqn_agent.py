@@ -226,27 +226,26 @@ class DQNAgent(object):
             batch = Transition(*zip(*transitions))
 
             state_batch = self.preprocessor(batch.state)
-            action_batch = torch.LongTensor(batch.action)
-            feedback_batch =  torch.FloatTensor(batch.gave_feedback)
+            action_batch = torch.LongTensor(batch.action).unsqueeze(1).to(TORCH_DEVICE)
+            feedback_batch =  torch.FloatTensor(batch.gave_feedback).to(TORCH_DEVICE)
 
             output = self.classif_feedback_net.forward(state_batch)
-            # feedback_per_action_logits = output.gather(1, action_batch)
-            labels = torch.zeros(feedback_per_action_logits)
-            labels[torch.arange(batch_size), action_batch] = feedback_batch.view(-1)
+            feedback_per_action_logits = output.gather(1, action_batch).squeeze(1)
 
-            assert labels.requires_grad == False
+            assert feedback_batch.requires_grad == False
             assert feedback_per_action_logits.requires_grad == True
-            assert labels.shape == feedback_per_action_logits.shape
+            assert feedback_per_action_logits.shape == feedback_batch.shape
+
             loss = self.classif_feedback_loss(feedback_per_action_logits, feedback_batch)
 
             self.classif_feedback_optim.zero_grad()
             loss.backward()
             self.classif_feedback_optim.step()
 
-            feedback_per_action_logits = feedback_per_action_logits.detach().cpu().view(-1).numpy()
+            feedback_per_action_logits = torch.sigmoid(feedback_per_action_logits.detach().cpu()).view(-1).numpy()
 
             rounded_feedback_logits = np.zeros_like(feedback_per_action_logits)
-            rounded_feedback_logits[feedback_per_action_logits > 0] = 1
+            rounded_feedback_logits[feedback_per_action_logits > 0.5] = 1
 
             y_true = feedback_batch.cpu().view(-1)
             random_acc = feedback_batch.mean().item()
@@ -260,7 +259,7 @@ class DQNAgent(object):
     def compute_learnt_feedback_logits(self, state_batch):
 
         output = self.classif_feedback_net.forward(state_batch)
-        output = F.sigmoid(output)
+        output = torch.sigmoid(output)
         return output.detach().cpu()
 
 
