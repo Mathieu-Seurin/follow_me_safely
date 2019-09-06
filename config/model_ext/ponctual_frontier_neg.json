@@ -1,0 +1,23 @@
+{
+  "name" : "ponctual_frontier_w0.5",
+
+  "dqn_params" : {
+
+    "learning_rate" : 1e-5,
+    "update_every_n_ep" : 50,
+    "nudging_loss_weight" : 0.5,
+    "nudging_margin" : 0.1,
+    "nudging_type" : "ponctual_frontier_neg",
+
+    "classif_learning_rate" : 1e-4,
+    "certainty_ceil_classif" : 0.4,
+    "entropy_loss_weight" : 0,
+    "use_true_label_for_frontier": false,
+    "classif_feedback_percentage" : 0.5,
+    "steps_to_wait_before_optim" : 0,
+    "classif_update_per_q_optim" : 1,
+    "classif_weight_decay" : 1e-5,
+
+    "q_loss_weight" : 1
+  }
+}

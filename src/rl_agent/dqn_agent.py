@@ -2,7 +2,7 @@ from rl_agent.agent_utils import Transition, ReplayMemory, ProportionReplayMemor
 
 from rl_agent.nudging_loss import feedback_bad_to_min_when_max, \
     feedback_bad_to_percent_max, feedback_bad_to_min, feedback_frontier_margin, \
-    feedback_frontier_margin_learnt_feedback, compute_entropy_loss
+    feedback_frontier_margin_learnt_feedback, compute_entropy_loss, feedback_ponctual_negative_only
 
 import torch
 import torch.nn.functional as F
@@ -83,6 +83,10 @@ class DQNAgent(object):
             elif loss_type == "frontier_feedback_learnt":
                 self.learn_feedback = True
                 self.nudging_loss = feedback_frontier_margin_learnt_feedback
+                self.use_true_labels = config["use_true_label_for_frontier"]
+            elif loss_type == "ponctual_frontier_neg":
+                self.learn_feedback = True
+                self.nudging_loss = feedback_ponctual_negative_only
                 self.use_true_labels = config["use_true_label_for_frontier"]
 
             else:

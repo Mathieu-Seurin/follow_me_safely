@@ -79,10 +79,9 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
                         rerun_expe = False
 
                 except tf.errors.DataLossError as e:
-                    raise(e)
                     print(e)
-                    print("Experiment doesn't seem to be over, rerun.")
-                    #os.remove(tf_event_path)
+                    os.remove(tf_event_path)
+
 
         if rerun_expe == False:
             print("Expe was over, don't rerun")

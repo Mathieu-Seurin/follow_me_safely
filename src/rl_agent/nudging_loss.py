@@ -5,7 +5,7 @@ import copy
 import torch
 
 
-def feedback_bad_to_min_when_max(qs, action, feedback, margin, regression_loss, feedback_logits=None, ceil=None):
+def feedback_bad_to_min_when_max(qs, action, feedback, margin, regression_loss, testing=False, feedback_logits=None, ceil=None):
     """
     Compute the expert loss when action is flagged as bad AND is the max q
 
@@ -51,15 +51,16 @@ def feedback_bad_to_min_when_max(qs, action, feedback, margin, regression_loss, 
     margin_malus = action_mask.float() * margin
 
     # Compute Q(s,a) - l(a_b, a)
-    ref_qs = qs_where_bad.detach() # You optimize with respect to this ref_qs minus the margin, so you need to detach
-    min_qs_minus_margin, _ = torch.min(ref_qs - margin_malus, dim=1)
+    #ref_qs = qs_where_bad.detach() # You optimize with respect to this ref_qs minus the margin, so you need to detach
+    min_qs_minus_margin, _ = torch.min(qs_where_bad - margin_malus, dim=1) # ref_qs
 
     # Actual classification loss
     assert min_qs_minus_margin.size() == qs_a_where_bad.size(), \
         "Problem in loss, size 1 {}  size 2 : {}".format(min_qs_minus_margin.size(), qs_a_where_bad.size())
 
-    assert qs_a_where_bad.requires_grad is True
-    assert min_qs_minus_margin.requires_grad is False
+    if not testing:
+        assert qs_a_where_bad.requires_grad is True
+        assert min_qs_minus_margin.requires_grad is True
 
     loss = regression_loss(min_qs_minus_margin, qs_a_where_bad) # Bring bad action down under margin
     return loss
@@ -191,8 +192,8 @@ def feedback_frontier_margin(qs, action, feedback, margin, regression_loss, test
     min_good = torch.min(qs_a_where_good) - margin
     max_bad = torch.max(qs_a_where_bad) + margin
 
-    min_good = min_good.item()
-    max_bad = max_bad.item()
+    # min_good = min_good.item()
+    # max_bad = max_bad.item()
 
     # Bring good actions above the max of bad actions
     qs_a_where_good_below_max = qs_a_where_good[qs_a_where_good < max_bad]
@@ -203,7 +204,7 @@ def feedback_frontier_margin(qs, action, feedback, margin, regression_loss, test
         max_bad_vec[:] = max_bad
 
         if not testing:
-            assert max_bad_vec.requires_grad == False
+            assert max_bad_vec.requires_grad == True
             assert qs_a_where_good_below_max.requires_grad == True
 
         loss_good = regression_loss(qs_a_where_good_below_max, max_bad_vec)
@@ -217,7 +218,7 @@ def feedback_frontier_margin(qs, action, feedback, margin, regression_loss, test
         min_good_vec[:] = min_good
 
         if not testing:
-            assert min_good_vec.requires_grad == False
+            assert min_good_vec.requires_grad == True
             assert qs_a_where_bad_above_min.requires_grad == True
 
         loss_bad = regression_loss(qs_a_where_bad_above_min, min_good_vec)
@@ -235,7 +236,75 @@ class FeedbackFrontierMarginLearnFeedback(torch.nn.Module):
     def forward(self, *input):
         pass
 
-def feedback_frontier_margin_learnt_feedback(qs, action=None, feedback=None, margin=None, regression_loss=None, testing=False, feedback_logits=None, ceil=0.5):
+
+
+def feedback_ponctual_both_way(qs, action=None, feedback=None, margin=None, regression_loss=None, testing=False, feedback_logits=None, ceil=None):
+    pass
+
+def feedback_ponctual_negative_only(qs, action=None, feedback=None, margin=None, regression_loss=None, testing=False, feedback_logits=None, ceil=None):
+
+    if feedback_logits is None :
+        return 0
+    n_actions = qs.size(1)
+    action = action.view(-1, 1)
+
+    feedback_logits = feedback_logits.to(TORCH_DEVICE)
+
+    # Check that feedback logits corresponds to true feedback, to remove some potentially harmful misprediction
+    feedback_checker = feedback_logits.gather(1, action).view(-1)
+    feedback_checker = (feedback_checker > (0.5+ceil)) == feedback.type(torch.uint8).view(-1)
+
+    # Delete every line where no feedback was given (nothing to optimize) and where feedback from model is the same as env.
+    env_feedback = (feedback == 1).view(-1) * feedback_checker
+    qs_feedback_checked = qs[env_feedback]
+    feedback_logits = feedback_logits[env_feedback]
+    action = action[env_feedback]
+
+    almost_sure_no_feedback = torch.zeros(*feedback_logits.size()).to(TORCH_DEVICE)
+
+    # Valid action that is almost sure (using a classification network), use them.
+    almost_sure_no_feedback[feedback_logits < (0.5 - ceil)] = 1
+
+    # check if at least there are "sure" predicted valid action per line
+    at_least_one_nofeedback_per_line = almost_sure_no_feedback.sum(dim=1).type(torch.uint8)
+
+    # Statistics about the number of action that are considered
+    # certainty_percentage_no_feed = (at_least_one_nofeedback_per_line.float() / n_actions).mean()
+
+    sure_no_feedback_per_line = at_least_one_nofeedback_per_line > 0
+
+    # Delete lines that does not contain at least 1 sure valid action
+    qs_feedback_checked = qs_feedback_checked[sure_no_feedback_per_line, :]
+    almost_sure_no_feedback = almost_sure_no_feedback[sure_no_feedback_per_line, :]
+    action = action[sure_no_feedback_per_line]
+
+    if qs_feedback_checked.size(0)==0:
+        return 0
+
+    qs_no_feedback = qs_feedback_checked.clone()#.detach() #Q(s,a) for action flagged as "don't give feedback" aka good actions by classification algorithm
+    qs_no_feedback[almost_sure_no_feedback == 0] = torch.max(qs_feedback_checked).item() + margin
+
+    min_no_feedback_per_line = qs_no_feedback.min(dim=1)[0] - margin
+    qs_a_bad = qs_feedback_checked.gather(1, action).view(-1)
+
+    # qs_to_nudge = qs_a_bad > min_no_feedback_per_line
+    # qs_a_bad = qs_a_bad[qs_to_nudge]
+    # min_no_feedback_per_line = min_no_feedback_per_line[qs_to_nudge]
+
+    if not testing:
+        assert min_no_feedback_per_line.requires_grad == True
+        assert qs_a_bad.requires_grad == True
+        reduction = 'mean'
+    else:
+        reduction = 'sum'
+
+    # ===== Get good action values above the best bad action
+    loss_feedback = regression_loss(qs_a_bad, min_no_feedback_per_line, reduction=reduction)
+
+    return loss_feedback
+
+
+def feedback_frontier_margin_learnt_feedback(qs, action=None, feedback=None, margin=None, regression_loss=None, testing=False, feedback_logits=None, ceil=None):
     """
     Compute the expert loss
 
@@ -318,18 +387,18 @@ if __name__ == "__main__":
     actions = torch.Tensor([0,0,0,0]).long()
     feedback = torch.Tensor([1,1,1,0])
 
-    assert feedback_bad_to_min_when_max(qs, actions, feedback, margin, regr_loss) == 0
+    assert feedback_bad_to_min_when_max(qs, actions, testing=True, feedback=feedback, margin=margin, regression_loss=regr_loss) == 0
 
     # Test 2
     qs = torch.arange(12).view(4,3).float()
     actions = torch.Tensor([0,0,0,0]).long()
     feedback = torch.Tensor([1,1,1,0])
-    loss1 = feedback_bad_to_min_when_max(qs, actions, feedback, margin, regr_loss)
+    loss1 = feedback_bad_to_min_when_max(qs, actions, testing=True, feedback=feedback, margin=margin, regression_loss=regr_loss)
 
     qs = torch.arange(12).view(4,3).float()
     actions = torch.Tensor([0,1,2,0]).long()
     feedback = torch.Tensor([1,1,1,0])
-    loss2 = feedback_bad_to_min_when_max(qs, actions, feedback, margin, regr_loss)
+    loss2 = feedback_bad_to_min_when_max(qs, actions, testing=True, feedback=feedback, margin=margin, regression_loss=regr_loss)
 
     assert loss1 < loss2
 
@@ -376,75 +445,133 @@ if __name__ == "__main__":
     # loss2s = feedback_frontier_margin(qs, actions, feedback, margin, regr_loss, testing=True)
 
     #=======================================================
-
-    qs = torch.arange(21).view(7, 3).float()
-    logits = torch.ones(7,3)
-    logits[:, 2] *= -1
-    logits[:, 1] = 0
-
-
-    loss1 = feedback_frontier_margin_learnt_feedback(qs, margin=margin, regression_loss=regr_loss, feedback_logits=logits,
-                                                     testing=True)
-    assert loss1 == 0
-
-    # =======================================================
-    qs = torch.arange(21).view(7, 3).float()
-    logits = torch.ones(7, 3)
-    logits[:, 0] = 0
-    logits[:, 1] = 0
-
-    loss2 = feedback_frontier_margin_learnt_feedback(qs, margin=margin, regression_loss=regr_loss,
-                                                     feedback_logits=logits,
-                                                     testing=True)
-    assert loss2 == 0
-
+    ceil = 0.4
     #=======================================================
-    qs = -torch.arange(21).view(7, 3).float()
-    logits = torch.ones(7, 3)
-    logits[:, 2] *= -1
-    logits[:, 1] = 0
 
-    loss3 = feedback_frontier_margin_learnt_feedback(qs, margin=margin, regression_loss=regr_loss,
-                                                     feedback_logits=logits,
-                                                     testing=True)
+    #
+    # qs = torch.arange(21).view(7, 3).float()
+    # logits = torch.ones(7,3)
+    # logits[:, 2] *= -1
+    # logits[:, 1] = 0
+    #
+    #
+    # loss1 = feedback_frontier_margin_learnt_feedback(qs, margin=margin, regression_loss=regr_loss, feedback_logits=logits,
+    #                                                  testing=True, ceil=ceil)
+    # assert loss1 == 0
+    #
+    # # =======================================================
+    # qs = torch.arange(21).view(7, 3).float()
+    # logits = torch.ones(7, 3)
+    # logits[:, 0] = 0.5
+    # logits[:, 1] = 0.5
+    #
+    # loss2 = feedback_frontier_margin_learnt_feedback(qs, margin=margin, regression_loss=regr_loss,
+    #                                                  feedback_logits=logits,
+    #                                                  testing=True, ceil=ceil)
+    # assert loss2 == 0
+    #
+    # #=======================================================
+    # qs = -torch.arange(21).view(7, 3).float()
+    # logits = torch.ones(7, 3)
+    # logits[:, 2] *= 0
+    # logits[:, 1] = 0.5
+    #
+    # loss3 = feedback_frontier_margin_learnt_feedback(qs, margin=margin, regression_loss=regr_loss,
+    #                                                  feedback_logits=logits,
+    #                                                  testing=True, ceil=ceil)
+    #
+    # #========================================================
+    #
+    # qs = torch.arange(21).view(7, 3).float()
+    # logits = torch.ones(7, 3)
+    # logits[:, 0] *= 0
+    # logits[:, 1] = 0.5
+    #
+    # loss4 = feedback_frontier_margin_learnt_feedback(qs, margin=margin, regression_loss=regr_loss,
+    #                                                  feedback_logits=logits,
+    #                                                  testing=True, ceil=ceil)
+    #
+    # assert loss3 == loss4
+    #
+    # # ========================================================
+    # qs = torch.arange(21).view(7, 3).float()
+    # logits = torch.ones(7, 3)
+    # logits[:, 0] *= -1
+    # logits[:, 1] = 0
+    # logits[-1, :] = 0
+    #
+    # loss5 = feedback_frontier_margin_learnt_feedback(qs, margin=margin, regression_loss=regr_loss,
+    #                                                  feedback_logits=logits,
+    #                                                  testing=True, ceil=ceil)
+    #
+    # assert loss5 != 0
+    # assert loss5 < loss4
+    #
+    # # =========================================================
+    # qs = torch.arange(21).view(7, 3).float()
+    # logits = torch.zeros(7, 3)
+    # logits[:,0] = 1
+    #
+    # loss6 = feedback_frontier_margin_learnt_feedback(qs, margin=margin, regression_loss=regr_loss,
+    #                                                  feedback_logits=logits,
+    #                                                  testing=True, ceil=ceil)
+    #
+    # assert loss6 == 0
+    #===========================================================
+    qs = torch.tensor([[0,0,0],[1,0,0.5],[0,1,0.5]]).float()
+    actions = torch.Tensor([1,1,1]).long()
+    feedback = torch.Tensor([0,1,1])
+    logits = torch.zeros_like(qs)
 
-    #========================================================
+    logits[1, 1] = 1
+    logits[2, 1] = 1
 
-    qs = torch.arange(21).view(7, 3).float()
-    logits = torch.ones(7, 3)
-    logits[:, 0] *= -1
-    logits[:, 1] = 0
+    loss7 = feedback_ponctual_negative_only(qs,
+                                            action=actions,
+                                            feedback=feedback,
+                                            margin=margin, regression_loss=regr_loss,
+                                            feedback_logits=logits,
+                                            testing=True, ceil=ceil)
 
-    loss4 = feedback_frontier_margin_learnt_feedback(qs, margin=margin, regression_loss=regr_loss,
-                                                     feedback_logits=logits,
-                                                     testing=True)
+    #assert loss7 == torch.tensor([0.6]), loss7
+    #===============================================================
+    qs = torch.tensor([[0, 0, 0], [0, 1, 0.5], [0, 1, 0.5]]).float()
+    actions = torch.Tensor([1, 1, 1]).long()
+    feedback = torch.Tensor([0, 1, 1])
+    logits = torch.zeros_like(qs)
 
-    assert loss3 == loss4
+    logits[1, 1] = 1
+    logits[2, 1] = 1
 
-    # ========================================================
+    loss7 = feedback_ponctual_negative_only(qs,
+                                            action=actions,
+                                            feedback=feedback,
+                                            margin=margin, regression_loss=regr_loss,
+                                            feedback_logits=logits,
+                                            testing=True, ceil=ceil)
 
-    qs = torch.arange(21).view(7, 3).float()
-    logits = torch.ones(7, 3)
-    logits[:, 0] *= -1
-    logits[:, 1] = 0
-    logits[-1, :] = 0
+    # assert loss7.item() == torch.tensor([1.2]), loss7
 
-    loss5 = feedback_frontier_margin_learnt_feedback(qs, margin=margin, regression_loss=regr_loss,
-                                                     feedback_logits=logits,
-                                                     testing=True)
+    #================================================================
 
-    assert loss5 != 0
-    assert loss5 < loss4
+    qs = torch.tensor([[0, 0, 0], [0, 1, 0.5], [0, 1, 0.5]]).float()
+    actions = torch.Tensor([1, 1, 1]).long()
+    feedback = torch.Tensor([0, 1, 1])
+    logits = torch.zeros_like(qs)
 
-    # =========================================================
-    qs = torch.arange(21).view(7, 3).float()
-    logits = torch.zeros(7, 3)
-    logits[:,0] = 1
+    logits[1, 1] = 1
+    logits[2, 1] = 1
+    logits[2, 0] = 1
 
-    loss6 = feedback_frontier_margin_learnt_feedback(qs, margin=margin, regression_loss=regr_loss,
-                                                     feedback_logits=logits,
-                                                     testing=True)
+    loss7 = feedback_ponctual_negative_only(qs,
+                                            action=actions,
+                                            feedback=feedback,
+                                            margin=margin, regression_loss=regr_loss,
+                                            feedback_logits=logits,
+                                            testing=True, ceil=ceil)
 
-    assert loss6 == 0
+    # assert loss7.item() == torch.tensor([0.78]), loss7
+
 
     print("Tests okay !")
+

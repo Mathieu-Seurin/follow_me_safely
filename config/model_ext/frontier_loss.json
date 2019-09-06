@@ -7,7 +7,7 @@
     "nudging_margin" : 0.1,
     "nudging_type" : "frontier",
 
-    "q_loss_weight" : 1
+    "q_loss_weight" : 0
 
   }
 }
