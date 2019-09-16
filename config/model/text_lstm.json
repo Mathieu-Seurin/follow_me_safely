@@ -1,5 +1,5 @@
 {
-  "name": "dqn_for_text",
+  "name": "dqn_text",
 
   "agent_type" : "dqn",
   "discount_factor": 0.99,
@@ -40,7 +40,7 @@
 
     "biased_sampling" : false,
 
-    "update_every_n_ep" : 60,
+    "update_every_n_iter" : 7000,
 
     "clip_grad" : true,
     "apply_loss_to_target" : false,
@@ -58,7 +58,16 @@
     "nudging_loss_weight" : 0,
     "nudging_type" : "none",
 
-    "classif_learning_rate" : 3e-4
+    "classif_learning_rate" : 3e-4,
+    "classif_weight_decay" : 1e-5,
+
+    "certainty_ceil_classif" : 0.4,
+    "classif_feedback_percentage" : 0,
+    "classif_update_per_q_optim" : 1,
+    "use_true_label_for_frontier" : false,
+    "steps_to_wait_before_optim" : 0
+
+
 
   }
 }

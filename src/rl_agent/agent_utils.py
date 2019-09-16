@@ -123,10 +123,10 @@ def check_params_changed(dict1, dict2):
         if torch.max(torch.abs(tmp1 - tmp2)).item() == 0:
             print('No change in params {}'.format(key))
 
-def compute_slow_params_update(slow_params, fast_params, tau):
+def compute_slow_params_update(slow_network, fast_network, tau):
 
-    slow_params_dict = slow_params.state_dict()
-    fast_params_dict = fast_params.state_dict()
+    slow_params_dict = slow_network.state_dict()
+    fast_params_dict = fast_network.state_dict()
 
     for module_key in slow_params_dict.keys() :
         slow_params_dict[module_key] += tau*(fast_params_dict[module_key] - slow_params_dict[module_key])

@@ -157,7 +157,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
             "description": True,
             "intermediate_reward": full_config["use_intermediate_reward"],
             "admissible_commands": True,
-            "policy_commands": True,
+            "policy_commands": full_config["use_intermediate_reward"],
         }
 
         reward_when_falling = 0
@@ -334,7 +334,7 @@ def train(env_config, env_ext, model_config, model_ext, exp_dir, seed, local_tes
                                      img_tensor=array_rendered, dataformats="HWC")
 
             # Update target network if needed
-            model.callback(epoch=num_episode)
+            #model.callback(epoch=num_episode)
 
             reward_undiscount_list.append(reward_total_not_discounted)
             reward_discount_list.append(reward_total_discounted)

@@ -1,4 +1,4 @@
-from rl_agent.agent_utils import Transition, ReplayMemory, ProportionReplayMemory
+from rl_agent.agent_utils import Transition, ReplayMemory, ProportionReplayMemory, compute_slow_params_update
 
 from rl_agent.nudging_loss import feedback_bad_to_min_when_max, \
     feedback_bad_to_percent_max, feedback_bad_to_min, feedback_frontier_margin, \
@@ -49,10 +49,11 @@ class DQNAgent(object):
         self.memory = ProportionReplayMemory(capacity=config["memory_size"])
         self.q_learning_feedback_percentage = config["feedback_percentage_in_buffer"]
 
-        self.update_every_n_ep = config["update_every_n_ep"]
+        self.update_every_n_iter = config["update_every_n_iter"]
 
         self.num_update_target = 0
         self.num_optim_dqn = 0
+        self.max_p_boltz = 0
 
         # ============ LOSSES : Bellman, feedback, regularization ========
         # ================================================================
@@ -153,7 +154,6 @@ class DQNAgent(object):
             self.minimum_epsilon = config["exploration_params"]["epsilon_minimum"]
             self.n_step_eps = 0
 
-
         self.select_action = lambda x : self._select_action(self.preprocessor(x))
         self.summary_writer = writer
 
@@ -205,6 +205,8 @@ class DQNAgent(object):
             - 2.5 * self.n_step_eps / self.expected_exploration_steps))
         self.n_step_eps += 1
 
+        self.max_p_boltz = max(p)
+
         return act
 
 
@@ -212,10 +214,19 @@ class DQNAgent(object):
         self.memory.push(*args)
 
     def callback(self, epoch):
+        pass
 
-        if epoch % self.update_every_n_ep == 0:
-            self.target_net.load_state_dict(self.policy_net.state_dict())
-            self.num_update_target += 1
+    def update_target(self, total_iter):
+
+        new_target = compute_slow_params_update(slow_network=self.target_net,
+                                                fast_network=self.policy_net,
+                                                tau=1/self.update_every_n_iter)
+        self.target_net.load_state_dict(new_target)
+
+
+        # if total_iter % self.update_every_n_iter == 0:
+        #     self.target_net.load_state_dict(self.policy_net.state_dict())
+        self.num_update_target += 1
 
     def train_feedback_classif(self):
 
@@ -417,6 +428,7 @@ class DQNAgent(object):
             self.summary_writer.add_scalar("data/feedback_loss", np.mean(self.feedback_loss_logger), total_iter)
             self.summary_writer.add_scalar("data/q_loss", np.mean(self.q_loss_logger), total_iter)
             self.summary_writer.add_scalar("data/feedback_percentage_in_buffer", np.mean(self.percent_feedback_logger), self.num_optim_dqn)
+            self.summary_writer.add_scalar("data/max_p_boltz", self.max_p_boltz, total_iter)
 
             # self.summary_writer.add_histogram("data/reward_in_batch_replay_buffer", reward_batch.detach().cpu().numpy(), self.num_update, bins=4)
             # self.summary_writer.add_histogramm("data/q_values", state_values.mean, self.num_update, bins=4)
@@ -446,5 +458,6 @@ class DQNAgent(object):
             self.action_classif_loss_logger = []
 
         self.num_optim_dqn += 1
+        self.update_target(total_iter=self.num_optim_dqn)
 
         #check_params_changed(old_params, self.policy_net.state_dict())

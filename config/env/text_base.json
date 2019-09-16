@@ -12,7 +12,7 @@
   "save_images_at" : [50, 51, 52, 53, 1200, 1201, 1202, 1203, 1204],
 
   "stop" : {
-    "max_iter_expe" : 5000,
+    "max_iter_expe" : 20000,
     "episode_reward_mean" : 800
   }
 }

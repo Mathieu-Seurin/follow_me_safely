@@ -338,6 +338,8 @@ class TextWorldWrapper(gym.Wrapper):
         self.action_space = gym.spaces.Discrete(len(self._all_doable_actions))
         self.env.action_map = self._all_doable_actions
 
+        self.env.max_steps = 100
+
         # Hidden action, shouldn't be used by agent
         #self._all_doable_actions.append('undo')
 
@@ -398,6 +400,7 @@ class TextWorldWrapper(gym.Wrapper):
 
             return command_list
 
+        #self.env.compute_intermediate_reward()
         obs, extra = self.env.reset()
         internal_game = self.env.env.textworld_env._wrapped_env.game_state._env.game
         obj_list = internal_game.objects_names_and_types
@@ -431,13 +434,19 @@ class TextWorldWrapper(gym.Wrapper):
             all_doable_actions.extend(_complete_action_recurs(command, obj_list))
 
         # Check that at least all necessary actions are in the possible actions list.
-        actions_not_available = []
-        for act in extra['policy_commands']:
-            if act not in all_doable_actions:
-                actions_not_available.append(act)
 
-        assert len(actions_not_available) == 0,\
-            "Some useful actions are not available, check all_doable_actions \n{}".format(actions_not_available)
+        actions_not_available = []
+        necessary_command = extra.get('policy_commands', [])
+
+        if necessary_command == []:
+            print("Cannot check policy commands, run with 'intermediate_reward' set to true")
+        else:
+            for act in necessary_command:
+                if act not in all_doable_actions:
+                    actions_not_available.append(act)
+
+            assert len(actions_not_available) == 0,\
+                "Some useful actions are not available, check all_doable_actions \n{}".format(actions_not_available)
 
         print("Number of available actions : ", len(all_doable_actions))
         return all_doable_actions

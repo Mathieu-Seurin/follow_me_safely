@@ -1,5 +1,5 @@
 {
-  "name": "dqn_conv_grid_update_4_baseline",
+  "name": "dqn_conv_grid_slow_target",
 
   "agent_type" : "dqn",
   "discount_factor": 0.99,
@@ -40,7 +40,7 @@
 
     "biased_sampling" : false,
 
-    "update_every_n_ep" : 40,
+    "update_every_n_iter" : 40,
 
     "clip_grad" : true,
     "apply_loss_to_target" : false,
